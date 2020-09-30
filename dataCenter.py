@@ -1,8 +1,10 @@
 from uhashring import HashRing
 from cache import Cache
-import simpy, re
+from directory import Directory
+import simpy, re, random, threading
 import pandas as pd
 from collections import deque
+from stats import JobStat
 
 class Mapper:
   def __init__(self, name):
@@ -26,6 +28,7 @@ def consistentHashing(nodeNum):
 
 class DataCenter:
   def __init__(self, name):
+    self.lock = threading.Lock()
     self.name = name
     self.config = None
     self.cache_layer = {}
@@ -37,16 +40,38 @@ class DataCenter:
     self.cpu = 0    
     self.placement = None 
     self.logger = None
-    self.obj_df = None #obj directory
+    self.obj_dir = Directory('obj_dir') #obj directory
+    self.blk_dir = Directory('blk_dir') #block directory
+    self.jobStat = JobStat()
     self.hash_ring = None
     self.nic_count = 0
     self.scheduler = None
+    self.repType = 'rep'
+    self.repCount = 3
+    self.ec=[]
+    self.rep_size = 4
+    self.chunk_size = 4
+    self.osdMap = None  
+    self.dl_access = 0 
   def build_directory(self):
-    print('Building Datacenter with dir')
+    print('Building Datacenter with object directory')
     col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
-    self.obj_df = pd.DataFrame(columns = col_names)
-    self.obj_df = self.obj_df.set_index(['objname'])
-    print(self.obj_df)
+    self.obj_dir.df = pd.DataFrame(columns = col_names)
+    self.obj_dir.df = self.obj_dir.df.set_index(['objname'])
+    
+    print('Building Datacenter with block directory')
+    col_names = ['blkname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
+    self.blk_dir.df = pd.DataFrame(columns = col_names)
+    self.blk_dir.df = self.blk_dir.df.set_index(['blkname'])
+    
+    col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
+    self.blk_dir.obj_df = pd.DataFrame(columns = col_names)
+    self.blk_dir.obj_df = self.blk_dir.obj_df.set_index(['objname'])
+
+    print('Building osd mapping for write cache')
+    col_names = ['blkname', 'osd_list', 'dirty']
+    self.osdMap = pd.DataFrame(columns = col_names)
+    self.osdMap = self.osdMap.set_index(['blkname'])
 
   def build_worker_nodes(self):
    for r in range(self.compute_nodes):
@@ -96,6 +121,7 @@ class DataCenter:
     size = int(config.get('Simulation', 'cache capacity')) #in bytes
     self.compute_nodes = int(config.get('Simulation', 'compute nodes')) 
     self.cpu = int(config.get('Simulation', 'cpu'))
+    self.chunk_size = int(config.get('Simulation', 'chunk size')) # in MB
     self.logger = logger
     if (self.placement == "consistent"):
       self.hash_ring = consistentHashing(self.c_nodes)
@@ -103,12 +129,25 @@ class DataCenter:
       self.build_directory()
 #      for i in range(4):
 #        self.obj_directory["file"+str(i)] = ["cache12"]
+    self.repType = config.get('Simulation', 'replication type')
+    if self.repType == 'rep':
+      self.repCount = int(config.get('Simulation', 'replication count'))
+      self.rep_size = self.chunk_size
+    elif self.repType == 'ec':
+      tmp = config.get('Simulation', 'replication count').split(',')   
+      self.ec = [int(tmp[0]),int(tmp[1])]
+      self.rep_size = float (self.chunk_size / self.ec[0])
+    print("reptyep","repcount",self.repType, self.rep_size)
     print ("Building Datacenter with ", self.placement)
     logger.info('Building Datacenter with')
 
     for i in range(self.c_nodes):
       c_name = "cache"+str(i) #i is rack id
       self.cache_layer[c_name]=Cache(c_name, size, policy)
+    
+    c_name = 'writeCache'
+    self.cache_layer[c_name]=Cache(c_name, size, policy)
+
     self.links = self.build_network(logger,env)
      
     print ("Building compute nodes and mappers")
@@ -148,4 +187,20 @@ class DataCenter:
       rack = dest.split("cache",1)[1]
       d = "nic1.in."+str(rack)
     return s, d
+  
+  def get_replica_loc(self, cache_id):
+    candidates = []
+    for i in range(self.c_nodes):
+     candidates.append('cache'+str(i))
+    candidates.remove(cache_id)
+    if self.repType == 'rep':
+      return  random.sample(candidates,  self.repCount-1)
+    elif self.repType == 'ec':
+      count = int(self.ec[0])+int(self.ec[1])
+      return random.sample(candidates,  count-1)
+    
+  def datalake_access(self):
+    self.dl_access += 1
+
+
 

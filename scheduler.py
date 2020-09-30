@@ -43,6 +43,7 @@ class Job:
     self.iotype = iotype
     self.slot = []
 
+
 class Scheduler:
   def __init__(self, nodes, cpu, directory, mapper_list, cache_layer):
     self.jobQueue = deque()
@@ -54,12 +55,11 @@ class Scheduler:
     self.cache_layer = cache_layer
     self.finish = False
     self.rid = Counter()
-
+  
   def addJobs(self, df):
     for i in range(len(df.index)):
       job = Job(i, df.loc[i].user_name, df.loc[i].startTime,  df.loc[i].inputdir,  df.loc[i].mapper,  df.loc[i].workflowid,  df.loc[i].input_size, df.loc[i].mapper_input_size, df.loc[i].iotype)
       self.jobQueue.append(job)
-      print(job.objname)
     self.allocateJob()
   
   @with_goto

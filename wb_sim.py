@@ -1,6 +1,6 @@
 import configparser, cache, argparse, logging, pprint, datetime
 import simpy, threading, multiThread, event
-from cache import Cache, User, Object
+from cache import Cache
 from traceParser import * 
 from dataCenter import DataCenter 
 from scheduler import Scheduler 
@@ -61,5 +61,10 @@ if __name__ == '__main__':
     pool.add_task(event.request_generator, i, dc, dc.scheduler, env)
   pool.wait_completion()
   env.run()
-  
+  print(dc.blk_dir.df) 
+  sort_by_ctime = dc.blk_dir.df.sort_values('c_time',ascending=False) 
+  print('---------sorted--------------')
+  print(sort_by_ctime)
+  print('---------jobs--------------')
+  print(dc.jobStat.df)
 #  s_thread.join()

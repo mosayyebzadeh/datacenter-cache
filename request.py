@@ -1,7 +1,6 @@
 
 class Request:
         def __init__(self, rid, mapper_id, task, source, dest, path, offset, size, rtype):
-                
                 self.req_id=rid
                 self.mapper_id=mapper_id
                 self.task=task
@@ -17,6 +16,7 @@ class Request:
                 self.endTime = 0
                 self.compTime = 0
                 self.info = None
+                self.name = task.job.objname+"_"+str(offset)
         def set_startTime(self,time):
                 self.startTime = time
         def set_endTime(self,time):
