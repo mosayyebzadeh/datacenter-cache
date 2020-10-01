@@ -36,35 +36,18 @@ def getDag(df):
 
 def traceParser(filename):
 #  df = pd.read_csv(filename, sep=',',skipinitialspace=True, header = None, nrows=5, usecols=[2,3,12,13,39,45,48,50])
-  df = pd.read_csv(filename, sep=',',skipinitialspace=True, header = None,  usecols=[0,1,2,3,4,5,6,7,8,9])
-  df.columns = ['startTime','finishTime','mapper','input_size','output_size','outputdir','user_name','inputdir','workflowid','iotype']
-  
+  df = pd.read_csv(filename, sep=',',skipinitialspace=True, header = None,  usecols=[0,1,2,3,4,5,6])
+ # df.columns = ['startTime','finishTime','mapper','input_size','output_size','outputdir','user_name','inputdir','workflowid','iotype']
+  df.columns = ['startTime','mapper','input_size','inputdir','user_name','workflowid','iotype']
   # round input to multiple of 4
   base = 4
 #  df.input_size = base * round(df.input_size/base)
   df['mapper_input_size'] = base * round( (df.input_size / df.mapper)/base)
   df.mapper_input_size = df.mapper_input_size.astype(int)
   df.input_size = df.input_size.astype(int)
-  dfJobs = df[['startTime', 'mapper', 'user_name','inputdir', 'input_size']]
-  dfJobs = dfJobs.sort_values('startTime')
   
-  col_names = ['startTime', 'taskid', 'user_name', 'inputdir', 'size', 'iotype']
-  dfTask = pd.DataFrame(columns = col_names)
- 
-  ind = 0; 
-  for row in dfJobs.itertuples():
-   # print(row)
-    for i in range(row[2]):
-      dfTask.loc[ind] = [row[1],i,row[3],row[4]+"_"+str(i), int( int(row[5])/int(row[2])), 'read']
-      ind += 1
-  #print(dfTask)    
-
-  #exit(0)
-  #df = df.sort_values('startTime')
-#  getDag(df)
   print(df)
   return df
-  exit(0)
 
 #def createFinalTrace(df):
   df_r = df[['startTime','user_name','inputdir', 'input_size','workflowid']]

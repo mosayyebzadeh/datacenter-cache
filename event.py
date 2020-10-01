@@ -17,10 +17,11 @@ def completion(req, dc, env):
     dc.scheduler.slots[req.task.rack, req.task.cpu] = 0
     dc.mapper_list[req.mapper_id].outstanding_req = 0
     dc.lock.acquire()
-    print("Task completion", req.job.objname, req.task.task_id, req.task.mapper_id)  
+    #print("Task completion", req.job.objname, req.task.task_id, req.task.mapper_id)  
     dc.jobStat.update(req.job.jid, finishTime)
-    if dc.jobStat.isFinished(req.job.jid):
+    if dc.jobStat.isFinished(req.job.jid) and req.rtype == 'write':
       dc.blk_dir.insertObj(req.job.objname, req.job.size, req.job.client,finishTime)
+      dc.cache_layer['writeCache'].put(req.job.objname, req.job.size, dc.blk_dir)
     dc.lock.release()
     dc.scheduler.allocateJob()
     runMappers(dc, dc.scheduler, env)
@@ -34,18 +35,18 @@ def forwardRequest(req, dc, env):
     else:
       req.path.append(dest)
       if dc.cache_layer[dest].cache.has_key(req.name):
-        dc.cache_layer[dest].put(req.name, req.size)
+        dc.cache_layer[dest].put(req.name, req.size, dc.blk_dir)
       else:
         req.path.append("DL")    
         dc.datalake_access()
 
   elif (dc.placement == "directory"):
     if dc.blk_dir.haskey(req.name): # Cache Hit
-      dest = dc.blk_dir.get_location(req.name)
+      dest = dc.blk_dir.get_location(req.name) # 
       req.path.append(dest)
-      if req.name in dc.cache_layer[dest].hashmap.keys():
-        dc.cache_layer[dest].put(req.name, req.size)
-        dc.blk_dir.put(req.name, dc.cache_layer[dest], env.now)
+      if dc.cache_layer[dest].has_key(req.name):
+        dc.cache_layer[dest].put(req.name, req.size, dc.blk_dir)
+        dc.blk_dir.put(req.name, req, dc.cache_layer[dest], env.now)
     else: #Cache miss
        req.path.append("DL")
        dc.datalake_access()
@@ -53,7 +54,7 @@ def forwardRequest(req, dc, env):
 def readReqEvent(req, dc, env):
   yield env.timeout(0)
   if dc.cache_layer[req.dest].has_key(req.name): # Local Cache Hit
-    dc.cache_layer[req.dest].put(req.name, req.size)
+    dc.cache_layer[req.dest].put(req.name, req.size, dc.blk_dir)
     dc.blk_dir.put(req.name, req, req.dest, env.now)
   else:
     forwardRequest(req, dc, env) 
@@ -81,6 +82,7 @@ def readResponseEvent(req, dc, env, links):
 
     if (len(req.path) >= 2):  
       if req.name not in dc.cache_layer[dest].hashmap.keys():
+        dc.cache_layer[req.dest].put(req.name, req.size, dc.blk_dir)
         dc.blk_dir.put(req.name, req, dest, env.now)
       generate_event(req, dc, env, "readResponse")
       
@@ -109,15 +111,19 @@ def writeReqEvent(req, dc, env, links):
     yield links[dLink].put(links[dLink].capacity)
 
   # write object and replicate to osd map, insert data to wb-cache and update directory
+  dc.lock.acquire()
+  candidates.append(req.dest)
   insert_osd_map(dc.osdMap, req.name, candidates, True) 
-  dc.cache_layer['writeCache'].put(req.name, dc.rep_size*(len(candidates)+1))
   dc.blk_dir.put(req.name, req, 'writeCache', env.now)
+#  dc.cache_layer['writeCache'].put(req.name, dc.rep_size*(len(candidates)+1), dc.blk_dir)
+  dc.lock.release()
   completion(req,dc,env)
-  flushEvent(dc, env, links)
 
-def flushEvent(dc, env, links):
-  candidates = dc.blk_dir.aged_items(1, 3)  
-  print('flush',candidates) 
+def flushEvent(dc, env, links): #flush based on FIFO
+  count = 3
+  time = 1
+  candidates = dc.blk_dir.aged_items(time, count)  
+  #print('flush',candidates) 
 
 def generate_event(req_old, dc, env, event_type):
   req = copy.deepcopy(req_old)

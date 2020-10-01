@@ -33,7 +33,7 @@ class Directory:
   def insertObj(self, key, size, client, time):
     self.obj_df.loc[key] = [time, size, 'writeCache', client, 1 , time ]
 
-  def remove(self, key, location):
+  def removeBlock(self, key, location):
     loc = self.df.loc[key,'location']
     if len(loc) == 1: #final copy
       self.df.delete(key)
@@ -49,7 +49,7 @@ class Directory:
       return dest
 
   def aged_items(self, time, count):
-    write_items= self.obj_df[self.obj_df['location'].apply(lambda x: 'writeCache' in x)]
-    sort_by_ctime = write_items.sort_values('c_time',ascending=False)
-    return sort_by_ctime
+#    write_items= self.obj_df[self.obj_df['location'].apply(lambda x: 'writeCache' in x)]
+    sort_by_ctime = self.obj_df.sort_values('c_time',ascending=False).head(count)
+    return list(sort_by_ctime.index)
 

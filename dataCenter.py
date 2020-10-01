@@ -40,7 +40,6 @@ class DataCenter:
     self.cpu = 0    
     self.placement = None 
     self.logger = None
-    self.obj_dir = Directory('obj_dir') #obj directory
     self.blk_dir = Directory('blk_dir') #block directory
     self.jobStat = JobStat()
     self.hash_ring = None
@@ -54,12 +53,7 @@ class DataCenter:
     self.osdMap = None  
     self.dl_access = 0 
   def build_directory(self):
-    print('Building Datacenter with object directory')
-    col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
-    self.obj_dir.df = pd.DataFrame(columns = col_names)
-    self.obj_dir.df = self.obj_dir.df.set_index(['objname'])
-    
-    print('Building Datacenter with block directory')
+    print('Building Datacenter with block and object directory')
     col_names = ['blkname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
     self.blk_dir.df = pd.DataFrame(columns = col_names)
     self.blk_dir.df = self.blk_dir.df.set_index(['blkname'])
@@ -146,7 +140,7 @@ class DataCenter:
       self.cache_layer[c_name]=Cache(c_name, size, policy)
     
     c_name = 'writeCache'
-    self.cache_layer[c_name]=Cache(c_name, size, policy)
+    self.cache_layer[c_name]=Cache(c_name, size, 'FIFO')
 
     self.links = self.build_network(logger,env)
      
