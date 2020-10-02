@@ -9,6 +9,7 @@ class JobStat:
     self.df.loc[key] = [job.objname, time, 'null' , job.size, job.iotype, job.client, job.mapper, job.workflowid, 0, False]
 
   def update(self, key, time):
+    print("update",key)
     count  =  self.df.loc[key, 'completed_tasks']
     count += 1
     self.df.loc[key, 'completed_tasks'] = count

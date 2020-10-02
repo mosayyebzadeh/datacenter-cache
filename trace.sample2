@@ -8,3 +8,4 @@
 52, 2,  16, file1,  user1,    worklod.id5,  read
 52, 2,  16, file8,  user1,    worklod.id6,  write
 52, 2,  32, file9,  user1,    worklod.id7,  write
+52, 2,  32, file1,  user1,    worklod.id8,  delete

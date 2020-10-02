@@ -41,6 +41,13 @@ class Directory:
       loc.remove(location)
       self.df.at[key, 'location'] = loc
 
+  def get_all_blk_location(self,key):
+    temp = self.df.loc[self.df.index.str.contains(key)]
+    return temp['location']
+
+  def get_all_obj_location(self,key):
+    return self.obj_df.loc[key].location    
+
   def get_location(self, key):
     dest = self.df.loc[key].location
     if isinstance(dest, list):
@@ -49,7 +56,6 @@ class Directory:
       return dest
 
   def aged_items(self, time, count):
-#    write_items= self.obj_df[self.obj_df['location'].apply(lambda x: 'writeCache' in x)]
-    sort_by_ctime = self.obj_df.sort_values('c_time',ascending=False).head(count)
+    sort_by_ctime = self.obj_df.sort_values('c_time',ascending=True).head(count)
     return list(sort_by_ctime.index)
 

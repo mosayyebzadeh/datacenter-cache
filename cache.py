@@ -85,3 +85,9 @@ class Cache:
     elif (self.policy == Cache.FIFO):
       print(self.name, "LRU", self.hashmap, list(self.cache.queue))
 
+  def remove(self,key):
+    del self.hashmap[key]
+    if (self.policy == Cache.LRU):
+      del self.cache[key]
+    elif (self.policy == Cache.FIFO):
+      a=4 #FIXME    

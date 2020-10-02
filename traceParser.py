@@ -38,14 +38,15 @@ def traceParser(filename):
 #  df = pd.read_csv(filename, sep=',',skipinitialspace=True, header = None, nrows=5, usecols=[2,3,12,13,39,45,48,50])
   df = pd.read_csv(filename, sep=',',skipinitialspace=True, header = None,  usecols=[0,1,2,3,4,5,6])
  # df.columns = ['startTime','finishTime','mapper','input_size','output_size','outputdir','user_name','inputdir','workflowid','iotype']
+
   df.columns = ['startTime','mapper','input_size','inputdir','user_name','workflowid','iotype']
+  df.loc[df['iotype'] == 'delete', ['mapper']] = 1 
   # round input to multiple of 4
+
   base = 4
-#  df.input_size = base * round(df.input_size/base)
   df['mapper_input_size'] = base * round( (df.input_size / df.mapper)/base)
   df.mapper_input_size = df.mapper_input_size.astype(int)
   df.input_size = df.input_size.astype(int)
-  
   print(df)
   return df
 
