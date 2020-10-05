@@ -43,7 +43,7 @@ class Directory:
 
   def get_all_blk_location(self,key):
     temp = self.df.loc[self.df.index.str.contains(key)]
-    return temp['location']
+    return temp.location
 
   def get_all_obj_location(self,key):
     return self.obj_df.loc[key].location    
@@ -59,3 +59,10 @@ class Directory:
     sort_by_ctime = self.obj_df.sort_values('c_time',ascending=True).head(count)
     return list(sort_by_ctime.index)
 
+  def remove_block_entry(self, key):
+    self.df = self.df.drop(key)
+    print(key)
+    print(self.df)
+    print('---') 
+  def remove_obj_entry(self, key):
+    self.obj_df = self.obj_df.drop(key)

@@ -82,9 +82,9 @@ def readResponseEvent(req, dc, env, links):
       yield links[dLink].put(links[dLink].capacity)
 
     if (len(req.path) >= 2):  
-      if req.name not in dc.cache_layer[dest].hashmap.keys():
-        dc.cache_layer[req.dest].put(req.name, req.size, dc.blk_dir)
-        dc.blk_dir.put(req.name, req, dest, env.now)
+#      if req.name not in dc.cache_layer[dest].hashmap.keys():
+      dc.cache_layer[req.dest].put(req.name, req.size, dc.blk_dir)
+      dc.blk_dir.put(req.name, req, dest, env.now)
       generate_event(req, dc, env, "readResponse")
       
     else:
@@ -126,14 +126,20 @@ def writeReqEvent(req, dc, env, links):
   completion(req,dc,env)
    
 def deleteReqEvent(req, dc, env):
+  print('deleteReqEvent', req.job.objname)
   yield env.timeout(0)
-  blk_loc = dc.blk_dir.get_all_blk_location(req.job.objname) 
-  print(blk_loc)
+  dc.lock.acquire()
+  blk_loc = dc.blk_dir.get_all_blk_location(req.job.objname)  
   for ind in blk_loc.index: 
-    for c in blk_loc['location'][ind]:
-      print(c, ind)
+    for c in blk_loc[ind]:
       dc.cache_layer[c].remove(ind) 
-
+    dc.blk_dir.remove_block_entry(ind)
+  dc.lock.release()
+#  try:
+#    dc.blk_dir.remove_obj_entry(req.job.objname)
+#  except KeyError:
+#    print('no entry in obj dir')
+    
 def flushEvent(dc, env, links): #flush based on FIFO
   count = 3
   time = 1
@@ -144,7 +150,6 @@ def generate_event(req_old, dc, env, event_type):
   del req_old
   req.rtype = event_type
   req.set_startTime(env.now)
-  print('generate event', req.rtype, req.req_id, req.name, req.mapper_id)
   if req.rtype == "read":
     event = env.process(readReqEvent(req, dc, env))
   elif req.rtype == "readResponse":
@@ -176,7 +181,8 @@ def request_generator(mapper_id, dc, scheduler, env):
         req = Request(req_id, mapper_id, task , source, destination, path, i, dc.chunk_size, task.job.iotype)
   #      print("Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, mapper_id)  
         generate_event(req, dc, env, task.job.iotype)
-
+        if task.job.iotype == 'delete':
+          break;
 
 
 
