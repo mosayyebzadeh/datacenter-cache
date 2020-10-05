@@ -35,7 +35,7 @@ if __name__ == '__main__':
   directory = {}
   dc = DataCenter("datacenter1")
   dc.build(config, logger, env) 
-  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, directory, dc.mapper_list, dc.cache_layer)
+  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, directory, dc.mapper_list, dc.cache_layer, dc.jobStat)
    
  
   logger.info('Parsing Trace File...')

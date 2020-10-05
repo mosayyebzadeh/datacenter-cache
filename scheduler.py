@@ -45,7 +45,7 @@ class Job:
 
 
 class Scheduler:
-  def __init__(self, nodes, cpu, directory, mapper_list, cache_layer):
+  def __init__(self, nodes, cpu, directory, mapper_list, cache_layer, js):
     self.jobQueue = deque()
     self.nodes = nodes
     self.cpu = cpu
@@ -55,7 +55,8 @@ class Scheduler:
     self.cache_layer = cache_layer
     self.finish = False
     self.rid = Counter()
-  
+    self.jobStat = js 
+ 
   def addJobs(self, df):
     for i in range(len(df.index)):
       job = Job(i, df.loc[i].user_name, df.loc[i].startTime,  df.loc[i].inputdir,  df.loc[i].mapper,  df.loc[i].workflowid,  df.loc[i].input_size, df.loc[i].mapper_input_size, df.loc[i].iotype)
@@ -68,6 +69,15 @@ class Scheduler:
     if self.jobQueue:
       job = self.jobQueue.popleft()
       attrs = vars(job)
+      if self.inProcess(job):
+        if len(self.jobQueue) > 0:
+          nextjob = self.jobQueue.popleft()
+          self.jobQueue.appendleft(job)
+          self.jobQueue.appendleft(nextjob)
+          goto .begin
+        else:
+          self.jobQueue.appendleft(job)
+          goto .wait
       if job.objname in self.directory:
         loc = self.directory[job.objname]
         self.allocateCacheRack(job,loc)
@@ -79,8 +89,15 @@ class Scheduler:
         goto .begin
       else:
         self.jobQueue.appendleft(job)
+        label .wait
     else:
       self.finish = True
+  
+  def inProcess(self, job):
+    if job.iotype == 'delete':
+      return self.jobStat.inProgress(job.objname)
+    else:
+      return False
 
   def allocateRack(self, job):
     free_slots = np.where(self.slots == 0)

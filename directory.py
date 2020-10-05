@@ -43,6 +43,10 @@ class Directory:
 
   def get_all_blk_location(self,key):
     temp = self.df.loc[self.df.index.str.contains(key)]
+    print("get", key)
+    print(temp)
+    print('----------','def')
+    print(self.df)
     return temp.location
 
   def get_all_obj_location(self,key):

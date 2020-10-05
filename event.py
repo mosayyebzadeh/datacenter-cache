@@ -130,7 +130,10 @@ def deleteReqEvent(req, dc, env):
   yield env.timeout(0)
   dc.lock.acquire()
   blk_loc = dc.blk_dir.get_all_blk_location(req.job.objname)  
+  print('----------', 'time', env.now)
+  print(blk_loc)
   for ind in blk_loc.index: 
+    print('--uu', ind)
     for c in blk_loc[ind]:
       dc.cache_layer[c].remove(ind) 
     dc.blk_dir.remove_block_entry(ind)
