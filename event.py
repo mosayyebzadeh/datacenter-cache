@@ -11,7 +11,6 @@ def runMappers(dc, scheduler, env):
 def completion(req_old, dc, env):
   req = copy.deepcopy(req_old)
   finishTime = env.now
-  print('completion', req.req_id, req.job.objname, req.job.iotype, req.job.split_size)
   req.set_endTime(finishTime)
   dc.mapper_list[req.mapper_id].outstanding_req +=1
   dc.outstanding_req[req.req_id] = [False, req.job.jid] 
@@ -129,17 +128,8 @@ def writeReqEvent(req, dc, env, links):
 def deleteReqEvent(req, dc, env):
   print('deleteReqEvent', req.job.objname)
   yield env.timeout(0)
-  if dc.jobStat.inProgress(req.job.objname):
-    print('inprog add outstand', req.job.objname)
-    req_new = copy.deepcopy(req)
-    dc.lock.acquire()
-    dc.outstanding_delete_op[req.job.objname] = req_new
-    del req
-    dc.lock.release()
-  else:
-    print("else")
-    deleteObject(req, dc, env)
-    completion(req, dc, env)
+  deleteObject(req, dc, env)
+  completion(req, dc, env)
 
 def deleteObject(req, dc, env):
   dc.lock.acquire()
@@ -149,11 +139,10 @@ def deleteObject(req, dc, env):
       if c != 'writeCache':
         dc.cache_layer[c].remove(ind)
     dc.blk_dir.remove_block_entry(ind)
-  print('--')
-  print(dc.blk_dir.obj_df)
   if dc.blk_dir.haskeyObj(req.job.objname):
-    print('tryy in', req.job.objname)
+    
     dc.blk_dir.remove_obj_entry(req.job.objname)
+    dc.cache_layer['writeCache'].remove(req.job.objname)
     delete_osd_map(dc.osdMap, req.job.objname)
   else:
     print('No nentry in OBJ dir', req.job.objname)

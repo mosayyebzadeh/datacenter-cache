@@ -61,7 +61,6 @@ if __name__ == '__main__':
     pool.add_task(event.request_generator, i, dc, dc.scheduler, env)
   pool.wait_completion()
   env.run()
-  print(dc.blk_dir.df) 
   sort_by_ctime = dc.blk_dir.df.sort_values('c_time',ascending=False) 
   print('---------sorted--------------')
   print(sort_by_ctime)
