@@ -90,4 +90,4 @@ class Cache:
     if (self.policy == Cache.LRU):
       del self.cache[key]
     elif (self.policy == Cache.FIFO):
-      a=4 #FIXME    
+      a=5

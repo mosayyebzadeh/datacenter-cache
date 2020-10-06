@@ -56,7 +56,9 @@ class Scheduler:
     self.finish = False
     self.rid = Counter()
     self.jobStat = js 
- 
+    self.delQueue =  deque()
+    self.readQueue =  deque()
+
   def addJobs(self, df):
     for i in range(len(df.index)):
       job = Job(i, df.loc[i].user_name, df.loc[i].startTime,  df.loc[i].inputdir,  df.loc[i].mapper,  df.loc[i].workflowid,  df.loc[i].input_size, df.loc[i].mapper_input_size, df.loc[i].iotype)
@@ -65,19 +67,38 @@ class Scheduler:
   
   @with_goto
   def allocateJob(self):
+    # wait for write/read finished before delete it
+    label .begindel
+    if self.delQueue:
+      job = self.delQueue.popleft()
+      if self.inProcess(job):
+        self.delQueue.appendleft(job)
+      else:
+        self.jobQueue.appendleft(job)    
+        goto .begindel
+
+    # wait for write to finished before read 
+    label .beginread
+    if self.readQueue:
+      job = self.readQueue.popleft()
+      if self.inProcessWrite(job):
+        self.readQueue.appendleft(job)
+      else:
+        self.jobQueue.appendleft(job)
+        goto .beginread
+
     label .begin
     if self.jobQueue:
       job = self.jobQueue.popleft()
       attrs = vars(job)
       if self.inProcess(job):
-        if len(self.jobQueue) > 0:
-          nextjob = self.jobQueue.popleft()
-          self.jobQueue.appendleft(job)
-          self.jobQueue.appendleft(nextjob)
-          goto .begin
-        else:
-          self.jobQueue.appendleft(job)
-          goto .wait
+        self.delQueue.appendleft(job)
+        goto .begin
+      
+      if self.inProcessWrite(job):
+        self.readQueue.appendleft(job)
+        goto .begin
+
       if job.objname in self.directory:
         loc = self.directory[job.objname]
         self.allocateCacheRack(job,loc)
@@ -89,13 +110,19 @@ class Scheduler:
         goto .begin
       else:
         self.jobQueue.appendleft(job)
-        label .wait
     else:
       self.finish = True
-  
+    
   def inProcess(self, job):
     if job.iotype == 'delete':
+      job.split_size = 4
       return self.jobStat.inProgress(job.objname)
+    else:
+      return False
+
+  def inProcessWrite(self, job):
+    if job.iotype == 'read':
+      return self.jobStat.inProgressWrite(job.objname)
     else:
       return False
 

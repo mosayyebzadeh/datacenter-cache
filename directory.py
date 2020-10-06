@@ -5,6 +5,12 @@ class Directory:
     self.df = None
     self.obj_df = None
 
+  def haskeyObj(self, key):
+    if key in self.obj_df.index:
+      return True
+    else:
+      return False
+
   def haskey(self, key):
     if key in self.df.index:  
       return True
@@ -43,10 +49,10 @@ class Directory:
 
   def get_all_blk_location(self,key):
     temp = self.df.loc[self.df.index.str.contains(key)]
-    print("get", key)
-    print(temp)
-    print('----------','def')
-    print(self.df)
+    #print("get", key)
+    #print(temp)
+    #print('----------','def')
+    #print(self.df)
     return temp.location
 
   def get_all_obj_location(self,key):
@@ -65,8 +71,8 @@ class Directory:
 
   def remove_block_entry(self, key):
     self.df = self.df.drop(key)
-    print(key)
-    print(self.df)
-    print('---') 
+    #print(key)
+    #print(self.df)
+    #print('---') 
   def remove_obj_entry(self, key):
     self.obj_df = self.obj_df.drop(key)

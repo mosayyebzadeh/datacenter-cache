@@ -53,6 +53,7 @@ class DataCenter:
     self.osdMap = None  
     self.dl_access = 0 
     self.outstanding_req = {}
+    self.outstanding_delete_op = {}
   def build_directory(self):
     print('Building Datacenter with block and object directory')
     col_names = ['blkname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']

@@ -25,6 +25,14 @@ class JobStat:
 
   def inProgress(self, key):
     subset = self.df.loc[self.df['objname'] == key]
+#    subset2 = subset.loc[subset['iotype'] == 'read']
+ #   print('inprogres-----------')
+ #   print(subset)
+#    print(subset2)
+ #   print('-----------')
     return subset.endtime.isnull().any()
 
-
+  def inProgressWrite(self,key):
+    subset = self.df.loc[self.df['objname'] == key]
+    subset2 = subset.loc[subset['iotype'] == 'write']
+    return subset2.endtime.isnull().any()
