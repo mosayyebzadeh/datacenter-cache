@@ -88,27 +88,42 @@ class Scheduler:
         goto .beginread
 
     label .begin
+    #print('XXXXXXXXXXXXXXXXXXX')
     if self.jobQueue:
+      #print('SCHEDULE directory are %s' %self.directory.df)
       job = self.jobQueue.popleft()
+      #print('XXXXXXXXX+++++++++++XXXXXXXXX job objext name is  %s' %job.objname)
       attrs = vars(job)
       if self.inProcess(job):
+        #print('XXXXXXXXX22222222222XXXXXXXXXX')
         self.delQueue.appendleft(job)
         goto .begin
       
       if self.inProcessWrite(job):
+        #print('XXXXXXXXXX3333333333333333333XXXXXXXXX')
         self.readQueue.appendleft(job)
         goto .begin
 
-      if job.objname in self.directory:
-        loc = self.directory[job.objname]
-        self.allocateCacheRack(job,loc)
-        print('Allocating Cached Data', ', '.join("%s: %s" % item for item in attrs.items()))
+      #FIXME: AMIN: if we want to simulate schedular working with the directory
+      # we need to un-comment this section and add our code here.
+      """ 
+      if job.objname+"_0" in self.directory.df.index:
+        loc = self.directory.df.loc[job.objname+'_0', 'location']
+        #print('XXXXXXXXXMMMMMMMMMMMXXXXXXXXX loc is  %s' %loc)
+        cache_loc = int(loc[0].split("cache")[1])
+        #print('XXXXXXXXXNNNNNNNNNNNXXXXXXXXX cacheloc is  %d' %cache_loc)
+        self.allocateCacheRack(job,cache_loc)
+        #print('*************** Allocating Cached Data', ', '.join("%s: %s" % item for item in attrs.items()))
         goto .begin
       elif (np.count_nonzero(self.slots == 0) >= job.mapper):
+      """
+      if (np.count_nonzero(self.slots == 0) >= job.mapper):
+        #print('XXXXXXXXXX44444444444444444444XXXXXXXXX')
         self.allocateRack(job)
-        print('Allocating Random Rack', ', '.join("%s: %s" % item for item in attrs.items()))
+        #print('Allocating Random Rack', ', '.join("%s: %s" % item for item in attrs.items()))
         goto .begin
       else:
+        #print('XXXXXXXXXX5555555555555555XXXXXXXXX')
         self.jobQueue.appendleft(job)
     else:
       self.finish = True
@@ -141,12 +156,14 @@ class Scheduler:
 
   def allocateCacheRack(self, job, cache_loc):
     cache_slots = np.where(self.slots[cache_loc] == 0)[0]
+    #print("CACHE SLOTS are ***** %s" %cache_slots)
     task_id = 0
     for i in cache_slots:
         job.slot.append([cache_loc,i])
         self.slots[cache_loc,i] = 1
-        mapper_id  = "map"+str(cache_loc)++"-"+str(i)
-        offset = i*job.split_size
+        mapper_id  = "map"+str(cache_loc)+"-"+str(i)
+        offset = task_id*job.split_size
+        #print("OFFSET IS 1 ***** %d" %offset)
         task = Task(task_id, job, mapper_id, cache_loc, i,  offset, offset+job.split_size)
         self.mapper_list[mapper_id].queue.append(task)
         task_id +=1
@@ -155,8 +172,9 @@ class Scheduler:
     for i in s:
         job.slot.append([cache_loc,i])
         self.slots[cache_loc,i] = 1
-        mapper_id  = "map"+str(cache_loc)++"-"+str(i)
-        offset = task_id*split_size
+        mapper_id  = "map"+str(cache_loc)+"-"+str(i)
+        offset = task_id*job.split_size
+        #print("OFFSET IS 2 ***** %d" %offset)
         task = Task(task_id, job, mapper_id, cache_loc, i, offset, offset+job.split_size)
         self.mapper_list[mapper_id].queue.append(task)
         task_id +=1

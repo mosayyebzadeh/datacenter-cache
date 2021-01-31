@@ -32,10 +32,10 @@ if __name__ == '__main__':
   logger.info('Creating Enviroment...')
   print ('Creating Enviroment...') 
   env = simpy.Environment()
-  directory = {}
+  #directory = {}
   dc = DataCenter("datacenter1")
   dc.build(config, logger, env) 
-  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, directory, dc.mapper_list, dc.cache_layer, dc.jobStat)
+  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, dc.blk_dir, dc.mapper_list, dc.cache_layer, dc.jobStat)
    
  
   logger.info('Parsing Trace File...')
@@ -49,18 +49,19 @@ if __name__ == '__main__':
   print('Running Simulation')
     
   dc.scheduler.addJobs(df) 
-#  dc.scheduler.allocateJob() 
-#  dc.scheduler.addJobs(df) 
-#  dc.scheduler.start()
-  #s_thread = threading.Thread(target=dc.scheduler.start2(env))
-  #s_thread.start()
   print("first jobs allocated") 
   # Thread pool for mappers
   pool = multiThread.ThreadPool(len(dc.mapper_list.keys()))
   for i in dc.mapper_list.keys():
     pool.add_task(event.request_generator, i, dc, dc.scheduler, env)
+
+  #FIXME: if LORE, uncomment the two following lines
+  pool.add_task(event.agingFunc, dc, env, dc.interval)
+  pool.add_task(event.cleanUpDir, dc, env, float(config.get('Directory', 'cleanup interval')))
+
   pool.wait_completion()
-  env.run()
+  env.run(until = config.get('Simulation', 'end'))
+  #env.run()
   sort_by_ctime = dc.blk_dir.df.sort_values('c_time',ascending=False) 
   print('---------sorted--------------')
   print(sort_by_ctime)
@@ -70,8 +71,18 @@ if __name__ == '__main__':
   print(dc.blk_dir.obj_df.sort_values('c_time',ascending=False))
   print('----------osd-mapping----------')
   print(dc.osdMap)
+  print('----------Datalake ----------')
+  print("Datalake access is %s" %(dc.dl_access))
   print('----------print cache----------')
-  dc.cache_layer['writeCache'].print()
-  dc.cache_layer['cache0'].print()
-  dc.cache_layer['cache1'].print()
+  hit_count = 0
+  miss_count = 0
+  for i in range(dc.c_nodes):
+    c_name = "cache"+str(i) #i is rack id
+    hit_count += dc.cache_layer[c_name].hit_count
+    miss_count += dc.cache_layer[c_name].miss_count
+    print("HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].hit_count))
+    print("MISS COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].miss_count))
+    dc.cache_layer[c_name].print()
+  print("Total Hit count is %d" %hit_count)
+  print("Total Miss count is %d" %miss_count)
 #  s_thread.join()

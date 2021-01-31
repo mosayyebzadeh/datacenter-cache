@@ -21,7 +21,7 @@ def completion(req_old, dc, env):
     dc.lock.acquire()
     dc.jobStat.update(req.job.jid, finishTime) # update job finish time
     if dc.jobStat.isFinished(req.job.jid) and req.rtype == 'write': # finish write request
-      dc.blk_dir.insertObj(req.job.objname, req.job.size, req.job.client,finishTime)
+      #dc.blk_dir.insertObj(req.job.objname, req.job.size, req.job.client,finishTime)
       dc.cache_layer['writeCache'].put(req.job.objname, req.job.size, dc.blk_dir)
     dc.lock.release()
     dc.scheduler.allocateJob()
@@ -36,7 +36,7 @@ def forwardRequest(req, dc, env):
     else:
       req.path.append(dest)
       if dc.cache_layer[dest].cache.has_key(req.name):
-        dc.cache_layer[dest].put(req.name, req.size, dc.blk_dir)
+        dc.cache_layer[dest].put(req.name, req.size, env.now, dc.blk_dir)
       else:
         req.path.append("DL")    
         dc.datalake_access()
@@ -46,8 +46,8 @@ def forwardRequest(req, dc, env):
       dest = dc.blk_dir.get_location(req.name) # 
       req.path.append(dest)
       if dc.cache_layer[dest].has_key(req.name):
-        dc.cache_layer[dest].put(req.name, req.size, dc.blk_dir)
-        dc.blk_dir.put(req.name, req, req.dest, env.now)
+        dc.cache_layer[dest].put(req.name, req.size, env.now, dc.blk_dir)
+        #dc.blk_dir.put(req.name, req, req.dest, env.now)
     else: #Cache miss
        req.path.append("DL")
        dc.datalake_access()
@@ -55,8 +55,8 @@ def forwardRequest(req, dc, env):
 def readReqEvent(req, dc, env):
   yield env.timeout(0)
   if dc.cache_layer[req.dest].has_key(req.name): # Local Cache Hit
-    dc.cache_layer[req.dest].put(req.name, req.size, dc.blk_dir)
-    dc.blk_dir.put(req.name, req, req.dest, env.now)
+    dc.cache_layer[req.dest].put(req.name, req.size, env.now, dc.blk_dir)
+    #dc.blk_dir.put(req.name, req, req.dest, env.now)
   else:
     forwardRequest(req, dc, env) 
   generate_event(req, dc, env, 'readResponse')
@@ -64,9 +64,10 @@ def readReqEvent(req, dc, env):
 def readResponseEvent(req, dc, env, links):
     source, dest = req.path[-1], req.path[-2]
     req.path.pop(len(req.path)-1) 
-    sLink, dLink = dc.get_link_id(source, dest)
     # Get the required amount of Bandwidth
     latency = 0
+
+    sLink, dLink = dc.get_link_id(source, dest)
     if sLink:
       yield links[sLink].get(links[sLink].capacity)
       latency = float(req.job.size) / links[sLink].capacity
@@ -83,8 +84,8 @@ def readResponseEvent(req, dc, env, links):
 
     if (len(req.path) >= 2):  
 #      if req.name not in dc.cache_layer[dest].hashmap.keys():
-      dc.cache_layer[req.dest].put(req.name, req.size, dc.blk_dir)
-      dc.blk_dir.put(req.name, req, dest, env.now)
+      dc.cache_layer[req.dest].put(req.name, req.size, env.now, dc.blk_dir)
+      #dc.blk_dir.put(req.name, req, dest, env.now)
       generate_event(req, dc, env, "readResponse")
       
     else:
@@ -94,6 +95,7 @@ def readResponseEvent(req, dc, env, links):
 
 
 def writeReqEvent(req, dc, env, links):
+  latency = 0
   sLink, dLink = dc.get_link_id(req.path[-2], req.path[-1])
   # write 4MB chunk to local rack
   yield links[sLink].get(links[sLink].capacity)
@@ -137,12 +139,12 @@ def deleteObject(req, dc, env):
   for ind in blk_loc.index:
     for c in blk_loc[ind]:
       if c != 'writeCache':
-        dc.cache_layer[c].remove(ind)
-    dc.blk_dir.remove_block_entry(ind)
+        dc.cache_layer[c].remove(ind, dc.blk_dir)
+    #dc.blk_dir.remove_block_entry(ind)
   if dc.blk_dir.haskeyObj(req.job.objname):
     
-    dc.blk_dir.remove_obj_entry(req.job.objname)
-    dc.cache_layer['writeCache'].remove(req.job.objname)
+    #dc.blk_dir.remove_obj_entry(req.job.objname)
+    dc.cache_layer['writeCache'].remove(req.job.objname, dc.blk_dir)
     delete_osd_map(dc.osdMap, req.job.objname)
   else:
     print('No nentry in OBJ dir', req.job.objname)
@@ -152,6 +154,31 @@ def flushEvent(dc, env, links): #flush based on FIFO
   count = 3
   time = 1
   candidates = dc.blk_dir.aged_items(time, count)  
+
+def agingFunc(dc, env, interval):
+  env.process(agingEvent(dc, env, interval))
+
+def agingEvent(dc, env, interval):
+  
+  #print('AMIIIIIIIIN AGING EVENT inerval is %s' %env.now)
+  for i in range(dc.c_nodes):
+    c_name = "cache"+str(i) #i is rack id
+    dc.cache_layer[c_name].halve_freq(dc.blk_dir, env.now)
+  yield env.timeout(interval)
+  env.process(agingEvent(dc, env, interval))
+  
+def cleanUpDir(dc, env, interval):
+  env.process(cleanUpEvent(dc, env, interval))
+
+def cleanUpEvent(dc, env, interval):
+  #print('AMIIIIIIIIN CLEANUP EVENT inerval is %s' %env.now)
+  dc.blk_dir.removeEntry()
+  yield env.timeout(interval)
+  env.process(cleanUpEvent(dc, env, interval))
+    
+
+
+
 
 def generate_event(req_old, dc, env, event_type):
   req = copy.deepcopy(req_old)
@@ -178,6 +205,7 @@ def request_generator(mapper_id, dc, scheduler, env):
       dc.mapper_list[mapper_id].outstanding_task.append(task.task_id)
       dc.lock.release()
       destination = "cache"+str(task.rack)
+      #destination = "cache0"
       source = task.mapper_id
       path = [source,destination]
       for i in range(task.offset, task.lenght, dc.chunk_size):
@@ -187,7 +215,7 @@ def request_generator(mapper_id, dc, scheduler, env):
         dc.outstanding_req[req_id] = [True, task.job.jid]
         dc.lock.release()
         req = Request(req_id, mapper_id, task , source, destination, path, i, dc.chunk_size, task.job.iotype)
-  #      print("Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, mapper_id)  
+        #print("Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, req.dest, mapper_id)  
         generate_event(req, dc, env, task.job.iotype)
         if task.job.iotype == 'delete':
           break;

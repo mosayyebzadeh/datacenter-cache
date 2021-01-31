@@ -38,9 +38,10 @@ class DataCenter:
     self.compute_nodes = 0    
     self.mapper_list = {}
     self.cpu = 0    
+    self.interval = 0    
     self.placement = None 
     self.logger = None
-    self.blk_dir = Directory('blk_dir') #block directory
+    self.blk_dir = Directory('blk_dir')
     self.jobStat = JobStat()
     self.hash_ring = None
     self.nic_count = 0
@@ -49,7 +50,7 @@ class DataCenter:
     self.repCount = 3
     self.ec=[]
     self.rep_size = 4
-    self.chunk_size = 4
+    self.chunk_size = 0
     self.osdMap = None  
     self.dl_access = 0 
     self.outstanding_req = {}
@@ -57,11 +58,16 @@ class DataCenter:
 
   def build_directory(self):
     print('Building Datacenter with block and object directory')
-    col_names = ['blkname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
+    self.blk_dir.interval = self.interval
+    self.blk_dir.size =  int(self.config.get('Directory', 'size'))
+    self.blk_dir.free_space =  int(self.config.get('Directory', 'size'))
+    self.blk_dir.threshold =  int(self.config.get('Directory', 'threshold'))
+    self.blk_dir.count =  int(self.config.get('Directory', 'lru count'))
+    col_names = ['blkname', 'c_time', 'size', 'location', 'owner', 'gfreq', 'valid', 'la_time']
     self.blk_dir.df = pd.DataFrame(columns = col_names)
     self.blk_dir.df = self.blk_dir.df.set_index(['blkname'])
     
-    col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'freq', 'la_time']
+    col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'gfreq', 'valid', 'la_time']
     self.blk_dir.obj_df = pd.DataFrame(columns = col_names)
     self.blk_dir.obj_df = self.blk_dir.obj_df.set_index(['objname'])
 
@@ -85,6 +91,7 @@ class DataCenter:
     links={}
     nic_count =  int(self.config.get('Network', 'nic count'))
     self.nic_count = nic_count
+    #print("nic COUNt is %d" %nic_count)
     for i in range(self.c_nodes):
       for j in range (nic_count-1):
         nic_id = "nic"+str(j)+" in"
@@ -108,14 +115,17 @@ class DataCenter:
     speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000 
     links[link_id]=simpy.Container(env, speed, init=speed)
   
+    #print("LINKS ARE %s" %links)
     return links
   
   def build(self, config, logger, env):
     self.config = config
     self.c_nodes = int(config.get('Simulation', 'cache nodes'))
+    #print("CACHE NODE is %d" %self.c_nodes)
     self.placement = config.get('Simulation', 'placement')
     policy = config.get('Simulation', 'cache policy')
     size = int(config.get('Simulation', 'cache capacity')) #in bytes
+    self.interval = float(config.get('Simulation', 'aging interval'))
     self.compute_nodes = int(config.get('Simulation', 'compute nodes')) 
     self.cpu = int(config.get('Simulation', 'cpu'))
     self.chunk_size = int(config.get('Simulation', 'chunk size')) # in MB
@@ -140,10 +150,12 @@ class DataCenter:
 
     for i in range(self.c_nodes):
       c_name = "cache"+str(i) #i is rack id
-      self.cache_layer[c_name]=Cache(c_name, size, policy)
+      self.cache_layer[c_name]=Cache(c_name, size, policy, self.interval)
     
     c_name = 'writeCache'
-    self.cache_layer[c_name]=Cache(c_name, size, 'FIFO')
+    self.cache_layer[c_name]=Cache(c_name, size, 'FIFO', self.interval)
+
+    #print("CACHE LAYER is %s" %self.cache_layer)
 
     self.links = self.build_network(logger,env)
      
@@ -166,6 +178,7 @@ class DataCenter:
     elif "map" in source:
       result = re.search('map(.*)-', source)
       rack = result.group(1)
+      #print("RACK **1** is %s" %rack)
       s = "nic0.in."+str(rack)
       return s, None
     else:
@@ -182,6 +195,7 @@ class DataCenter:
       return None, d
     else:
       rack = dest.split("cache",1)[1]
+      #print("RACK **2** is %s" %rack)
       d = "nic1.in."+str(rack)
     return s, d
   
