@@ -55,8 +55,8 @@ class Cache:
             locations.append(self.name)
         value = {"size": size, "lfreq":1, "location":locations, "time":0}
         self.cache[key] = value
-        owner = directory.get_owner(key)
-        directory.put(key, size, self.name, owner, 0)
+        #owner = directory.get_owner(key)
+        directory.put(key, size, self.name, 0)
         #self.cache.update(key = size)
     elif (self.policy == Cache.LORE):
         value = self.cache[key]
@@ -70,9 +70,9 @@ class Cache:
         value = {"size": size, "lfreq":lfreq, "location":locations, "time":time}
         #print("AMIN UPDATE2 key is %s" %key)
         self.cache[key] = value
-        owner = directory.get_owner(key)
+        #owner = directory.get_owner(key)
         #print("AMIN UPDATE3 key is %s" %key)
-        directory.put(key, size, self.name, owner, time)
+        directory.put(key, size, self.name, time)
     elif (self.policy == Cache.FIFO):
         self.cache.put(key)
 
@@ -92,7 +92,7 @@ class Cache:
     value = {"size": size, "lfreq":1, "location":self.name, "time":0}
     self.cache[key] = value
     #self.cache[key] = str(size) + ":" + str(lfreq)
-    directory.put(key, size, self.name, self.name, 0)
+    directory.put(key, size, self.name, 0)
     self.hashmap[key] = size
     #print("AMIN: insertLRU %s hashmap is %s" %(self.name, self.hashmap))
     self.free_space -= size
@@ -109,7 +109,7 @@ class Cache:
     self.cache[key] = value
     #print("AMIN: INSERTLORE Key is %s and value is %s" %(key, value))
     self.hashmap[key] = size
-    directory.put(key, size, self.name, self.name, time)
+    directory.put(key, size, self.name, time)
     self.free_space -= size
     self.miss_count +=1
 
@@ -136,7 +136,7 @@ class Cache:
     lastCandidKey = ""
     #print("AMIN: EvictLORE key to be inserted is %s" %key)
     #print("AMIN: EvictLORE %s before keys are %s" %(self.name, self.cache.items()))
-    if (not directory.haskey(key)) or directory.df.loc[key, 'valid'] == 0:
+    if (not directory.haskey(key)) or directory.df.at[key, 'valid'] == 0:
         for candidKey in self.cache.keys():
             #print("AMIN: candid key is %s" %candidKey)
             value = self.cache[candidKey]
@@ -185,19 +185,21 @@ class Cache:
     directory.removeBlock(oid, self.name)
     self.free_space += int(self.hashmap[oid])
     del self.hashmap[oid]     
- 
-  def halve_freq(self, directory, time):
+
+  """
+  def halve_freq(self):
     #print("AMIN: HALVE_FREQ time is %s" %time)
-    self.halve_lfreq(time)
+    self.halve_lfreq()
+    
     for key in directory.df.index:
       owner = directory.get_owner(key)
       if owner == self.name:
         directory.halve_gfreq(key)
+  """
 
-  def halve_lfreq(self, key):
+  def halve_lfreq(self):
     for key in self.cache.keys():
       value = self.cache[key]
-      #print("AMIN: HALVE_LLLLFREQ: %s key is %s value[lfreq] is %s" %(self.name, key, value["lfreq"]))
       lfreq = value["lfreq"]
       value["lfreq"] = int(lfreq/2)
       self.cache[key] = value

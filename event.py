@@ -163,8 +163,10 @@ def agingEvent(dc, env, interval):
   #print('AMIIIIIIIIN AGING EVENT inerval is %s' %env.now)
   for i in range(dc.c_nodes):
     c_name = "cache"+str(i) #i is rack id
-    dc.cache_layer[c_name].halve_freq(dc.blk_dir, env.now)
+    dc.cache_layer[c_name].halve_lfreq()
+  dc.blk_dir.halve_gfreq()
   yield env.timeout(interval)
+  #print('AMIIIIIIIIN AGING EVENT')
   env.process(agingEvent(dc, env, interval))
   
 def cleanUpDir(dc, env, interval):

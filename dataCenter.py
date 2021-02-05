@@ -63,7 +63,7 @@ class DataCenter:
     self.blk_dir.free_space =  int(self.config.get('Directory', 'size'))
     self.blk_dir.threshold =  int(self.config.get('Directory', 'threshold'))
     self.blk_dir.count =  int(self.config.get('Directory', 'lru count'))
-    col_names = ['blkname', 'c_time', 'size', 'location', 'owner', 'gfreq', 'valid', 'la_time']
+    col_names = ['blkname', 'c_time', 'size', 'location', 'gfreq', 'valid', 'la_time']
     self.blk_dir.df = pd.DataFrame(columns = col_names)
     self.blk_dir.df = self.blk_dir.df.set_index(['blkname'])
     
