@@ -47,7 +47,7 @@ class Directory:
 
   """
   def insertObj(self, key, size, client, time):
-    self.obj_df.loc[key] = [time, size, 'writeCache', client, 1 , time ]
+    self.obj_df.at[key] = [time, size, 'writeCache', client, 1 , time ]
   """
   def removeBlock(self, key, location):
     loc = self.df.at[key,'location']
@@ -57,9 +57,10 @@ class Directory:
     else: #more copies just update location field
       loc.remove(location)
       self.df.at[key, 'location'] = loc
+
   """
   def get_owner(self, key):
-    owner = self.df.loc[key, "owner"]
+    owner = self.df.at[key, "owner"]
     return owner
   """
 
@@ -73,7 +74,7 @@ class Directory:
 
   """
   def get_all_obj_location(self,key):
-    return self.obj_df.loc[key].location    
+    return self.obj_df.at[key].location    
   """
   #FIXME: should we choose a better cache location?
   def get_location(self, key):
@@ -84,11 +85,6 @@ class Directory:
       return dest
 
   """
-  def halve_gfreq(self):
-    for key in self.df.index:
-        #print(key)
-        self.df.at[key, 'gfreq'] = int(self.df.at[key, 'gfreq']/2)
-  """
   def halving(self, value):
     return value/2
 
@@ -98,6 +94,10 @@ class Directory:
         value=row['gfreq']),
         axis=1)
 
+  """
+
+  def halve_gfreq(self):
+    self.df['gfreq'] = self.df['gfreq']/2
 
   """
   def aged_items(self, time, count):

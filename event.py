@@ -24,7 +24,8 @@ def completion(req_old, dc, env):
       #dc.blk_dir.insertObj(req.job.objname, req.job.size, req.job.client,finishTime)
       dc.cache_layer['writeCache'].put(req.job.objname, req.job.size, dc.blk_dir)
     dc.lock.release()
-    dc.scheduler.allocateJob()
+    for rack in range(dc.c_nodes): 
+        dc.scheduler.allocateJob(rack)
     runMappers(dc, dc.scheduler, env)
   
 def forwardRequest(req, dc, env):
@@ -43,7 +44,7 @@ def forwardRequest(req, dc, env):
 
   elif (dc.placement == "directory"):
     if dc.blk_dir.haskey(req.name): # Cache Hit
-      dest = dc.blk_dir.get_location(req.name) # 
+      dest = dc.blk_dir.get_location(req.name) #
       req.path.append(dest)
       if dc.cache_layer[dest].has_key(req.name):
         dc.cache_layer[dest].put(req.name, req.size, env.now, dc.blk_dir)
@@ -166,7 +167,6 @@ def agingEvent(dc, env, interval):
     dc.cache_layer[c_name].halve_lfreq()
   dc.blk_dir.halve_gfreq()
   yield env.timeout(interval)
-  #print('AMIIIIIIIIN AGING EVENT')
   env.process(agingEvent(dc, env, interval))
   
 def cleanUpDir(dc, env, interval):
@@ -217,10 +217,9 @@ def request_generator(mapper_id, dc, scheduler, env):
         dc.outstanding_req[req_id] = [True, task.job.jid]
         dc.lock.release()
         req = Request(req_id, mapper_id, task , source, destination, path, i, dc.chunk_size, task.job.iotype)
-        #print("Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, req.dest, mapper_id)  
+        #print("Generator Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, req.dest, mapper_id)  
+        #print("Generator Request:", req.rtype)  
         generate_event(req, dc, env, task.job.iotype)
         if task.job.iotype == 'delete':
           break;
-
-
 

@@ -186,25 +186,31 @@ class Cache:
     self.free_space += int(self.hashmap[oid])
     del self.hashmap[oid]     
 
-  """
-  def halve_freq(self):
-    #print("AMIN: HALVE_FREQ time is %s" %time)
-    self.halve_lfreq()
-    
-    for key in directory.df.index:
-      owner = directory.get_owner(key)
-      if owner == self.name:
-        directory.halve_gfreq(key)
-  """
-
   def halve_lfreq(self):
     for key in self.cache.keys():
       value = self.cache[key]
       lfreq = value["lfreq"]
       value["lfreq"] = int(lfreq/2)
       self.cache[key] = value
-      #print("AMIN: HALVE_LLLLFREQ2: %s key is %s value[lfreq] is %d cache[lfreq] is %d" %(self.name, key, value["lfreq"], self.cache[key]["lfreq"]))
 
+  """
+  def halve_freq(self, directory, time):
+    #print("AMIN: HALVE_FREQ time is %s" %time)
+    self.halve_lfreq(time)
+    for key in directory.df.index:
+      owner = directory.get_owner(key)
+      if owner == self.name:
+        directory.halve_gfreq(key)
+
+  def halve_lfreq(self, key):
+    for key in self.cache.keys():
+      value = self.cache[key]
+      #print("AMIN: HALVE_LLLLFREQ: %s key is %s value[lfreq] is %s" %(self.name, key, value["lfreq"]))
+      lfreq = value["lfreq"]
+      value["lfreq"] = int(lfreq/2)
+      self.cache[key] = value
+      #print("AMIN: HALVE_LLLLFREQ2: %s key is %s value[lfreq] is %d cache[lfreq] is %d" %(self.name, key, value["lfreq"], self.cache[key]["lfreq"]))
+  """
 
 
 
