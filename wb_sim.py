@@ -62,9 +62,10 @@ if __name__ == '__main__':
   for i in dc.mapper_list.keys():
     pool.add_task(event.request_generator, i, dc, dc.scheduler, env)
 
-  #FIXME: if LORE, uncomment the two following lines
-  pool.add_task(event.agingFunc, dc, env, dc.interval)
-  pool.add_task(event.cleanUpDir, dc, env, float(config.get('Directory', 'cleanup interval')))
+  policy = config.get('Simulation', 'cache policy')
+  if policy == "LORE":
+    pool.add_task(event.agingFunc, dc, env, dc.interval)
+  #pool.add_task(event.cleanUpDir, dc, env, float(config.get('Directory', 'cleanup interval')))
 
   pool.wait_completion()
   env.run(until = config.get('Simulation', 'end'))
@@ -90,6 +91,8 @@ if __name__ == '__main__':
     hit_count += dc.cache_layer[c_name].hit_count
     miss_count += dc.cache_layer[c_name].miss_count
     print("HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].hit_count))
+    print("Local HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].local_hit))
+    print("Remote HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].remote_hit))
     print("MISS COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].miss_count))
     #dc.cache_layer[c_name].print()
   print("Total Hit count is %d" %hit_count)

@@ -1,4 +1,9 @@
-1,  2,  32, file1,  user1,    worklod.id1,  read
-1,  2,  32, file1,  user1,    worklod.id1,  read
-1,  2,  32, file1,  user1,    worklod.id1,  read
-3,  2,  16, file3,  user1,    worklod.id1,  read
+1,1,  4, L,  user1,    worklod.id1,  read
+1,1,  4, M,  user1,    worklod.id1,  read
+1,1,  4, B,  user1,    worklod.id1,  read
+1,1,  4, M,  user1,    worklod.id1,  read
+1,1,  4, C,  user1,    worklod.id1,  read
+1,1,  4, D,  user1,    worklod.id1,  read
+1,1,  4, F,  user1,    worklod.id1,  read
+1,1,  4, D,  user1,    worklod.id1,  read
+1,1,  4, E,  user1,    worklod.id1,  read

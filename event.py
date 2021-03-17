@@ -3,12 +3,21 @@ import simpy, datetime, threading, copy
 from cache import *
 from osd_op import *
 
+def printCacheStats(dc):
+    print("-------Cache-------")
+    d = dc.blk_dir.dict
+    for k in dc.cache_layer.keys():
+        print(dc.cache_layer[k].name, list(dc.cache_layer[k].hashmap.keys()) )
+    for k in d.keys():
+        print(k, d[k]['gfreq'], d[k]['location'], d[k]['valid'])
 
 def runMappers(dc, scheduler, env):
   for i in dc.mapper_list.keys():
     request_generator(i, dc, scheduler, env)
 
 def completion(req_old, dc, env):
+  print("%s: Completion event is %s, path is %s" %(env.now, req_old.job.objname, req_old.path))
+  printCacheStats(dc)
   req = copy.deepcopy(req_old)
   finishTime = env.now
   req.set_endTime(finishTime)
@@ -43,21 +52,31 @@ def forwardRequest(req, dc, env):
         dc.datalake_access()
 
   elif (dc.placement == "directory"):
-    if dc.blk_dir.haskey(req.name): # Cache Hit
+    # Remote cache HIT
+    if dc.blk_dir.haskey(req.name) and dc.blk_dir.dict[req.name]['valid'] == 1:
       dest = dc.blk_dir.get_location(req.name) #
       req.path.append(dest)
       if dc.cache_layer[dest].has_key(req.name):
         dc.cache_layer[dest].put(req.name, req.size, env.now, dc.blk_dir)
-        #dc.blk_dir.put(req.name, req, req.dest, env.now)
+        dc.cache_layer[dest].remote_hit +=1
+        dc.blk_dir.updateGFreq(req.name)
+        #dc.blk_dir.put(req.name, req.size, dest, env.now)
     else: #Cache miss
        req.path.append("DL")
+       #dc.blk_dir.put(req.name, req.size, req.dest, env.now)
+       #dc.blk_dir.updateGFreq(req.name)
+       if (req.name in dc.blk_dir.dict.keys()):
+         dc.blk_dir.updateGFreq(req.name)
        dc.datalake_access()
 
 def readReqEvent(req, dc, env):
   yield env.timeout(0)
+  printCacheStats(dc)
   if dc.cache_layer[req.dest].has_key(req.name): # Local Cache Hit
     dc.cache_layer[req.dest].put(req.name, req.size, env.now, dc.blk_dir)
-    #dc.blk_dir.put(req.name, req, req.dest, env.now)
+    dc.cache_layer[req.dest].local_hit +=1
+    dc.blk_dir.updateGFreq(req.name)
+    #dc.blk_dir.put(req.name, req.size, req.dest, env.now)
   else:
     forwardRequest(req, dc, env) 
   generate_event(req, dc, env, 'readResponse')
@@ -83,10 +102,11 @@ def readResponseEvent(req, dc, env, links):
     if dLink:
       yield links[dLink].put(links[dLink].capacity)
 
-    if (len(req.path) >= 2):  
+    if (len(req.path) >= 2):
+      #print(source, dest)
 #      if req.name not in dc.cache_layer[dest].hashmap.keys():
       dc.cache_layer[req.dest].put(req.name, req.size, env.now, dc.blk_dir)
-      #dc.blk_dir.put(req.name, req, dest, env.now)
+      #dc.blk_dir.put(req.name, req.size, dest, env.now)
       generate_event(req, dc, env, "readResponse")
       
     else:
@@ -188,8 +208,10 @@ def generate_event(req_old, dc, env, event_type):
   req.rtype = event_type
   req.set_startTime(env.now)
   if req.rtype == "read":
+    print("%s:  Generated READ event is %s, path is %s" %(env.now, req.job.objname, req.path))
     event = env.process(readReqEvent(req, dc, env))
   elif req.rtype == "readResponse":
+    print("%s: Generated RESPONSE event is %s, path is %s" %(env.now, req.job.objname, req.path))
     env.process(readResponseEvent(req, dc, env, dc.links))
   elif req.rtype == "write":
     env.process(writeReqEvent(req, dc, env, dc.links))

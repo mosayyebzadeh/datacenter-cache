@@ -7,78 +7,54 @@ class Directory:
     self.interval = 0
     self.threshold = 0
     self.count = 0
-    self.df = None
-    #self.obj_df = None
+    self.dict = {}
 
-  """
-  def haskeyObj(self, key):
-    if key in self.obj_df.index:
-      return True
-    else:
-      return False
-  """
   def haskey(self, key):
-    if key in self.df.index:  
+    if key in self.dict.keys():  
       return True
     else:
       return False
 
   def put(self, key, size, location, time):
-    if self.haskey(key): # update directory another copy exists
-      self.update(key, size, location, time)
-    else: # new record
-      self.insert(key, size, location, time)
-
-  def update(self, key, size, location, time):
-    self.df.at[key, 'la_time'] = time #update last access time
-    loc = self.df.at[key,'location'] # add new location
-    if location not in loc: # miss 
+    value = self.dict.setdefault(key, {'c_time': time, 'size': size, 'location': [location], 'gfreq': 1, 'valid': 1, 'la_time': time})
+    value['la_time'] = time #update last access time
+    #value['gfreq'] = value['gfreq'] + 1 # update global access freq
+    value['valid'] = 1 # update global access freq
+    loc = value['location'] # add new location
+    if location not in loc: # miss
       loc.append(location)
-      self.df.at[key, 'location'] = loc
-    else: # means hit 
-      self.df.at[key, 'gfreq'] = self.df.at[key,'gfreq'] + 1 # update global access freq
-   
-
-  def insert(self, key, size, location, time):
+      value['location'] = loc
+    self.dict.update({key: value}) 
     self.free_space -= 1
-    gfreq = 1
-    valid = 1
-    self.df.at[key] = [time, size, [location], gfreq, valid, time]
 
-  """
-  def insertObj(self, key, size, client, time):
-    self.obj_df.at[key] = [time, size, 'writeCache', client, 1 , time ]
-  """
+  def updateGFreq(self, key):
+    self.dict[key]['gfreq'] +=1 # update global access freq
+
+  def updateTime(self, key, time):
+    self.dict[key]['la_time'] = time # update global access freq
+
+
   def removeBlock(self, key, location):
-    loc = self.df.at[key,'location']
+    value = self.dict.get(key)
+    loc = value['location']
     if len(loc) == 1: #final copy
-      #self.df.drop(key)
-      self.df.at[key, 'valid'] = 0 #There is no cache having the data
-    else: #more copies just update location field
-      loc.remove(location)
-      self.df.at[key, 'location'] = loc
+        value['valid'] = 0
+        loc = []
+        value['location'] = loc
+    else:
+        loc.remove(location)
+        value['location'] = loc
 
-  """
-  def get_owner(self, key):
-    owner = self.df.at[key, "owner"]
-    return owner
-  """
+    self.dict.update({key: value}) #There is no cache having the data
+
 
   def get_all_blk_location(self,key):
-    temp = self.df.at[self.df.index.str.contains(key)]
-    #print("get", key)
-    #print(temp)
-    #print('----------','def')
-    #print(self.df)
-    return temp.location
+    temp = self.dict.get(key)['location']
+    return temp
 
-  """
-  def get_all_obj_location(self,key):
-    return self.obj_df.at[key].location    
-  """
   #FIXME: should we choose a better cache location?
   def get_location(self, key):
-    dest = self.df.at[key, 'location']
+    dest = self.dict.get(key)['location']
     if isinstance(dest, list):
       return random.choice(dest)
     else:
@@ -97,8 +73,8 @@ class Directory:
   """
 
   def halve_gfreq(self):
-    self.df['gfreq'] = self.df['gfreq']/2
-
+      for key in self.dict.keys():
+        self.dict[key]['gfreq'] /= 2
   """
   def aged_items(self, time, count):
     sort_by_ctime = self.obj_df.sort_values('c_time',ascending=True).head(count)
@@ -108,14 +84,10 @@ class Directory:
   def removeEntry(self):
     #print('AMIN remove entry keys are: %s' %self.df.index)
     if (self.size - self.free_space >= self.threshold):
-      #print('AMIN remove entry: directory is almost full')
-      sort_by_lastAccessTime = self.df.sort_values('la_time',ascending=True).head(self.count)
-      keys =  list(sort_by_lastAccessTime.index)
-      #print('AMIN remove entry: candidate lru keys are %s' %keys)
-      for key in keys:
-        if self.df.at[key, 'valid'] == 0:
+      for key in self.dict.keys():
+        if self.dict[key]['valid'] == 0:
           #print('AMIN remove entry: found an invalid key: %s' %key)
-          self.df = self.df.drop(key)
+          del self.dict[key]
           self.free_space += 1
           if (self.size - self.free_space < self.threshold):
             break
