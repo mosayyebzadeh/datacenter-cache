@@ -1,6 +1,7 @@
-# cache-sim: Event-Driven Simulation for object store cache
+# wb_sim: Event-Driven Simulation for object store cache
 
-cache-sim is an datacenter-scale cache architecture simulation for hierarchical network topologies. The simulation framework is implemented using [simpy](https://simpy.readthedocs.io/en/latest/) which is a process-based discrete-event simulation based on Python.
+wb_sim is an datacenter-scale cache architecture simulation for hierarchical network topologies. The simulation framework is implemented using [simpy](https://simpy.readthedocs.io/en/latest/) which is a process-based discrete-event simulation based on Python.
+For now, it only simulates read operations, but we are working on adding write and delete operations.
 
 # File Inventory:
   * config.ini - Config File
@@ -23,12 +24,14 @@ pip install -r requirements.txt
 # Input Trace File Format
  * Job_ID, mapper_number, size, objectName, userName, worklodName, operation
 
-  mapper_number should be removed and it can be anything. We calculate it in the simulator.
+     mapper_number should be removed and it can be anything. We calculate it in the simulator.
  
-  operation can be "Read, Write, Delete" requests. For now, only read is working correctly.
+     operation can be "read, write, delete" requests. For now, only read is working correctly.
 
  * To Do: 
- Update write and delete opertions.
+ ** Update write and delete opertions.
+
+ ** Clean the code
 
 # Usage
 
