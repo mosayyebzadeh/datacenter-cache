@@ -17,15 +17,18 @@ pip install -r requirements.txt
 
 # Configuring Simulation For Your Enviroment 
   Edit 'config.ini' for your environment. Certain variables must be configured for your test environment.
+  The most important ones are the number of cache servers (which also should be equal to compute nodes.), the size of each cache server, and the trace file for each cache server.
  
   
 # Input Trace File Format
- * Job_ID,mapper_number,  size, objectName,  userName,    worklodName,  operation
+ * Job_ID, mapper_number, size, objectName, userName, worklodName, operation
 
+  mapper_number should be removed and it can be anything. We calculate it in the simulator.
  
- Each line represents "Read, Write, Delete" requests. Simulator read the trace and start issuing these requests.
- To DO: 
- Update write and delete sections
+  operation can be "Read, Write, Delete" requests. For now, only read is working correctly.
+
+ * To Do: 
+ Update write and delete opertions.
 
 # Usage
 
