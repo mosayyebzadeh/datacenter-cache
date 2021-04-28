@@ -29,9 +29,10 @@ pip install -r requirements.txt
      operation can be "read, write, delete" requests. For now, only read is working correctly.
 
  * To Do: 
- ** Update write and delete opertions.
 
- ** Clean the code
+     Update write and delete opertions.
+
+     Clean the code
 
 # Usage
 
