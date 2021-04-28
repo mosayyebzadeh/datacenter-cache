@@ -2,7 +2,7 @@ from goto import with_goto
 import threading, random, itertools
 import numpy as np
 from collections import deque
-import csv
+import csv, math
 
 class Counter(object):
     def __init__(self):
@@ -29,6 +29,7 @@ class Task:
     self.offset = offset
     self.lenght = lenght
     self.cpu = cpu
+    self.reqCount = 0
     self.completed = 0
 
 class Job:
@@ -43,11 +44,12 @@ class Job:
     self.workflowid = workflowid
     self.iotype = iotype
     self.split_size = split_size
+    self.taskList = deque()
     self.slot = []
 
 
 class Scheduler:
-  def __init__(self, nodes, cpu, directory, mapper_list, cache_layer, js):
+  def __init__(self, nodes, cpu, directory, mapper_list, cache_layer, js, mapper_size):
     self.nodes = nodes
     self.jobQueue = {}
     for i in range(nodes):
@@ -60,6 +62,7 @@ class Scheduler:
     self.finish = False
     self.rid = Counter()
     self.jobStat = js 
+    self.mapper_size =mapper_size
     #self.delQueue =  deque()
     #self.readQueue =  deque()
 
@@ -95,8 +98,14 @@ class Scheduler:
     with open(traceFile) as csvFile:
         csvReader = csv.reader(csvFile, delimiter=',', skipinitialspace=True)
         for row in csvReader:
-            job = Job(int(row[0]), int(row[0]), int(row[1]), int(row[2]), str(row[3]), str(row[4]), str(row[5]), str(row[6]), 4 * round((int(row[2]) / int(row[1]))/4))
+            mapper = math.ceil(float(row[2])/ float(self.mapper_size))
+            print(float(row[2]), str(row[3]))
+
+            job = Job(int(row[0]), int(row[0]), mapper, int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), self.mapper_size)
+            #job = Job(int(row[0]), int(row[0]), int(float(row[1])), int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), 4 * round((int(float(row[2])) / int(float(row[1])))/4))
             self.jobQueue[rack].append(job)
+        #for i in range(len(list(self.jobQueue[rack]))):
+        #    print(list(self.jobQueue[rack])[i].__dict__)
         self.allocateJob(rack)
 
   """
@@ -112,67 +121,33 @@ class Scheduler:
   @with_goto
   def allocateJob(self, rack):
     # wait for write/read finished before delete it
-    """
-    label .begindel
-    if self.delQueue:
-      job = self.delQueue.popleft()
-      if self.inProcess(job):
-        self.delQueue.appendleft(job)
-      else:
-        self.jobQueue.appendleft(job)    
-        goto .begindel
-
-    # wait for write to finished before read 
-    label .beginread
-    if self.readQueue:
-      job = self.readQueue.popleft()
-      if self.inProcessWrite(job):
-        self.readQueue.appendleft(job)
-      else:
-        self.jobQueue.appendleft(job)
-        goto .beginread
-    """
     label .begin
-    #print('XXXXXXXXXXXXXXXXXXX')
     if self.jobQueue[rack]:
-      #print('SCHEDULE directory are %s' %self.directory.df)
       job = self.jobQueue[rack].popleft()
-      #print('XXXXXXXXX+++++++++++XXXXXXXXX job objext name is  %s' %job.objname)
       attrs = vars(job)
-      """
-      if self.inProcess(job):
-        #print('XXXXXXXXX22222222222XXXXXXXXXX')
-        self.delQueue.appendleft(job)
-        goto .begin
-      
-      if self.inProcessWrite(job):
-        #print('XXXXXXXXXX3333333333333333333XXXXXXXXX')
-        self.readQueue.appendleft(job)
-        goto .begin
-      """
+      #print("creating task for: ", job.__dict__)
       #FIXME: AMIN: if we want to simulate schedular working with the directory
       # we need to un-comment this section and add our code here.
       """ 
       if job.objname+"_0" in self.directory.df.index:
         loc = self.directory.df.loc[job.objname+'_0', 'location']
-        #print('XXXXXXXXXMMMMMMMMMMMXXXXXXXXX loc is  %s' %loc)
         cache_loc = int(loc[0].split("cache")[1])
-        #print('XXXXXXXXXNNNNNNNNNNNXXXXXXXXX cacheloc is  %d' %cache_loc)
         self.allocateCacheRack(job,cache_loc)
-        #print('*************** Allocating Cached Data', ', '.join("%s: %s" % item for item in attrs.items()))
         goto .begin
       elif (np.count_nonzero(self.slots == 0) >= job.mapper):
       """
-      #print(job.mapper)
-      if (np.count_nonzero(self.slots[rack] == 0) >= job.mapper):
-        #print('XXXXXXXXXX44444444444444444444XXXXXXXXX')
+      #if (np.count_nonzero(self.slots[rack] == 0) >= job.mapper):
+      if (np.count_nonzero(self.slots[rack] == 0) >= 1):
+
+        self.createTask(rack, job)
+        #print("allocate JOB: allocate rack")
         self.allocateRack(rack, job)
-        #print('Allocating Random Rack', ', '.join("%s: %s" % item for item in attrs.items()))
-        goto .begin
+        #goto .begin
       else:
-        #print('XXXXXXXXXX5555555555555555XXXXXXXXX')
+        #print("no job allocation  ")
         self.jobQueue[rack].appendleft(job)
     else:
+      #print("finish is True")
       self.finish = True
     
   def inProcess(self, job):
@@ -188,24 +163,41 @@ class Scheduler:
     else:
       return False
 
+  def createTask(self, rack, job):
+    #print("rack is %s" %rack)
+    task_id = 0
+    lenght = job.size
+    #print("job:", job.__dict__)
+    for i in range(job.mapper):
+      #print("i is %s" %i)
+      task_size = job.split_size
+
+      offset = i*job.split_size
+      if( lenght < job.split_size):
+        task_size = lenght;  
+      task = Task(task_id, job, "", rack, 0, offset,  task_size)
+      lenght -= job.split_size
+      task_id +=1
+      job.taskList.append(task)
+      #print("Create TASK ", task.job.__dict__)
+ 
   def allocateRack(self, rack, job):
     #print("rack is %s" %rack)
     free_slots = np.where(self.slots[rack] == 0)
     #print("FREE SLOTS are %s" %free_slots)
-    task_id = 0
-    for i in range(job.mapper):
-      #print("i is %s" %i)
-      c = free_slots[0][i]
-      #print("C is %s" %free_slots)
-      job.slot.append([rack,c])
-      self.slots[rack,c] = 1
-      mapper_id  = "map"+str(rack)+"-"+str(c)
+    #for i in range(len(free_slots)):
 
-      #print("mapper id is %s" %free_slots)
-      offset = i*job.split_size
-      task = Task(task_id, job, mapper_id, rack, c, offset, offset+job.split_size )
-      self.mapper_list[mapper_id].queue.append(task)
-      task_id +=1
+    task = job.taskList.popleft()
+    c = free_slots[0][0]
+      #print("C is %s" %free_slots)
+    job.slot.append([rack,c])
+    self.slots[rack,c] = 1
+    task.mapper_id  = "map"+str(rack)+"-"+str(c)
+    task.cpu  = c
+
+    self.mapper_list[task.mapper_id].queue.append(task)
+    #print("Allocate RACK: ", task.job.__dict__)
+
   """
   def allocateCacheRack(self, job, cache_loc):
     cache_slots = np.where(self.slots[cache_loc] == 0)[0]

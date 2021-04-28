@@ -28,10 +28,12 @@ class Directory:
     self.free_space -= 1
 
   def updateGFreq(self, key):
-    self.dict[key]['gfreq'] +=1 # update global access freq
+    if key in self.dict.keys():  
+        self.dict[key]['gfreq'] +=1 # update global access freq
 
   def updateTime(self, key, time):
-    self.dict[key]['la_time'] = time # update global access freq
+    if key in self.dict.keys():  
+        self.dict[key]['la_time'] = time # update global access freq
 
 
   def removeBlock(self, key, location):
@@ -74,7 +76,7 @@ class Directory:
 
   def halve_gfreq(self):
       for key in self.dict.keys():
-        self.dict[key]['gfreq'] /= 2
+        self.dict[key]['gfreq'] = int(self.dict[key]['gfreq']/2)
   """
   def aged_items(self, time, count):
     sort_by_ctime = self.obj_df.sort_values('c_time',ascending=True).head(count)

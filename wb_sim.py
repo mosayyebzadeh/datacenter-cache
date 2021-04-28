@@ -34,7 +34,7 @@ if __name__ == '__main__':
   #directory = {}
   dc = DataCenter("datacenter1")
   dc.build(config, logger, env) 
-  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, dc.blk_dir, dc.mapper_list, dc.cache_layer, dc.jobStat)
+  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, dc.blk_dir, dc.mapper_list, dc.cache_layer, dc.jobStat, dc.mapper_size)
    
  
   racks = int(config.get('Simulation', 'cache nodes'))
@@ -48,26 +48,30 @@ if __name__ == '__main__':
     print("Generating Final Trace File...")
     dc.scheduler.addJobs(i, trace_file) 
     #df[i] = traceParser(trace_file)
-
+    print(dc.scheduler.jobQueue[i])
 
   logger.info('Running Simulation')
   print('Running Simulation')
     
-  #df = traceParser(trace_file)
-  #dc.scheduler.addJobs(df, racks) 
-  print("first jobs allocated") 
   # Thread pool for mappers
+  """
   print(len(dc.mapper_list.keys()))
   pool = multiThread.ThreadPool(len(dc.mapper_list.keys()))
   for i in dc.mapper_list.keys():
     pool.add_task(event.request_generator, i, dc, dc.scheduler, env)
 
+  """
+  for i in dc.mapper_list.keys():
+    event.request_generator(i, dc, dc.scheduler, env)
+
   policy = config.get('Simulation', 'cache policy')
-  if policy == "LORE":
-    pool.add_task(event.agingFunc, dc, env, dc.interval)
+  #if policy == "LORE":
+  #  pool.add_task(event.agingFunc, dc, env, dc.interval)
+
+
   #pool.add_task(event.cleanUpDir, dc, env, float(config.get('Directory', 'cleanup interval')))
 
-  pool.wait_completion()
+  #pool.wait_completion()
   env.run(until = config.get('Simulation', 'end'))
   #env.run()
   """

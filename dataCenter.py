@@ -125,11 +125,12 @@ class DataCenter:
     #print("CACHE NODE is %d" %self.c_nodes)
     self.placement = config.get('Simulation', 'placement')
     policy = config.get('Simulation', 'cache policy')
-    size = int(config.get('Simulation', 'cache capacity')) #in bytes
+    size = int(config.get('Simulation', 'cache capacity')) #in MB
     self.interval = float(config.get('Simulation', 'aging interval'))
     self.compute_nodes = int(config.get('Simulation', 'compute nodes')) 
     self.cpu = int(config.get('Simulation', 'cpu'))
     self.chunk_size = int(config.get('Simulation', 'chunk size')) # in MB
+    self.mapper_size = int(config.get('Simulation', 'mapper size')) # in MB
     self.logger = logger
     if (self.placement == "consistent"):
       self.hash_ring = consistentHashing(self.c_nodes)
@@ -153,8 +154,8 @@ class DataCenter:
       c_name = "cache"+str(i) #i is rack id
       self.cache_layer[c_name]=Cache(c_name, size, policy, self.interval)
     
-    c_name = 'writeCache'
-    self.cache_layer[c_name]=Cache(c_name, size, 'FIFO', self.interval)
+    #c_name = 'writeCache'
+    #self.cache_layer[c_name]=Cache(c_name, size, 'FIFO', self.interval)
 
     #print("CACHE LAYER is %s" %self.cache_layer)
 

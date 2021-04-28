@@ -1,9 +1,5 @@
-1,1,  4, A,  user1,    worklod.id1,  read
-1,1,  4, B,  user1,    worklod.id1,  read
-1,1,  4, A,  user1,    worklod.id1,  read
-1,1,  4, C,  user1,    worklod.id1,  read
-1,1,  4, D,  user1,    worklod.id1,  read
-1,1,  4, C,  user1,    worklod.id1,  read
-1,1,  4, D,  user1,    worklod.id1,  read
-1,1,  4, E,  user1,    worklod.id1,  read
-1,1,  4, F,  user1,    worklod.id1,  read
+1,1,  2, A,  user1,    worklod.id1,  read
+1,1,  1, B,  user1,    worklod.id1,  read
+1,1,  2, A,  user1,    worklod.id1,  read
+1,1,  1, C,  user1,    worklod.id1,  read
+1,1,  2, A,  user1,    worklod.id1,  read
