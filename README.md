@@ -4,8 +4,8 @@ cache-sim is an datacenter-scale cache architecture simulation for hierarchical 
 
 # File Inventory:
   * config.ini - Config File
-  * trase.sample2 - Sample Trace File
-  * simulator.py - Main simulator code which executes the simulator
+  * trase0 - Sample Trace File
+  * wb_sim.py - Main simulator code which executes the simulator
  
  
 # Prerequisites:
@@ -20,13 +20,15 @@ pip install -r requirements.txt
  
   
 # Input Trace File Format
- * trase.sample2 - Sample trace.
+ * Job_ID,mapper_number,  size, objectName,  userName,    worklodName,  operation
+
  
  Each line represents "Read, Write, Delete" requests. Simulator read the trace and start issuing these requests.
- 
+ To DO: 
+ Update write and delete sections
 
 # Usage
 
 ```
-python simulator.py -c <config_file> -t <trace_file>
+python3 wb_sim.py -c <configFile>
 ```
