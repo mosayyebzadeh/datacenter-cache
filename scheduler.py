@@ -20,7 +20,7 @@ class Counter(object):
         return value
 
 class Task:
-  def __init__(self, task_id, job, mapper_id, rack, cpu, offset, lenght):
+  def __init__(self, task_id, job, mapper_id, rack, cpu, offset, lenght, taskReqCount):
     self.task_id = task_id
     self.job = job
     self.mapper_id = mapper_id
@@ -29,12 +29,12 @@ class Task:
     self.offset = offset
     self.lenght = lenght
     self.cpu = cpu
-    self.reqCount = 0
+    self.taskReqCount = taskReqCount
     self.completed = 0
 
 class Job:
   #def __init__(self, jid, client, time, objname, mapper, workflowid, size, split_size, iotype):
-  def __init__(self, jid, time, mapper, size, objname, client, workflowid, iotype, split_size):
+  def __init__(self, jid, time, mapper, size, objname, client, workflowid, iotype, split_size, chunk_size):
     self.jid = jid
     self.submitTime = time  
     self.mapper = mapper  
@@ -44,79 +44,54 @@ class Job:
     self.workflowid = workflowid
     self.iotype = iotype
     self.split_size = split_size
+    self.chunk_size = chunk_size
     self.taskList = deque()
-    self.slot = []
+    #self.slot = []
 
 
 class Scheduler:
-  def __init__(self, nodes, cpu, directory, mapper_list, cache_layer, js, mapper_size):
+  def __init__(self, nodes, cpu, directory, mapper_list, cache_layer, mapper_size, chunk_size):
     self.nodes = nodes
     self.jobQueue = {}
     for i in range(nodes):
         self.jobQueue[i] = deque()
     self.cpu = cpu
-    self.slots = np.zeros((nodes,cpu))
+    #self.slots = np.zeros((nodes,cpu))
+    #FIXME: we consider each rack will have one process running at a same time
+    # if you need to run several process, you have to change the following to use CPU
+    self.slots = []
+    for x in range(nodes):
+        self.slots.append(0)
+
     self.directory = directory
     self.mapper_list = mapper_list
     self.cache_layer = cache_layer
     self.finish = False
     self.rid = Counter()
-    self.jobStat = js 
-    self.mapper_size =mapper_size
+    #self.jobStat = js 
+    self.mapper_size = mapper_size
+    self.chunk_size = chunk_size
     #self.delQueue =  deque()
     #self.readQueue =  deque()
 
-  """
-  def addJobs(self, df, racks):
-    #job = {}
-
-        for i in range(len(df.index)):
-            #job = Job(i, df.loc[i].user_name, df.loc[i].startTime,  df.loc[i].inputdir,  df.loc[i].mapper,  df.loc[i].workflowid,  df.loc[i].input_size, df.loc[i].mapper_input_size, df.loc[i].iotype)
-            self.jobQueue[j].append(job)
-        self.allocateJob(j)
-    for j in range(racks):
-        job = df[j].apply(
-            lambda col: Job(
-            jid=col['startTime'],
-            time=col['startTime'],
-            mapper=col['mapper'],
-            size=col['input_size'],
-            objname=col['inputdir'],
-            client=col['user_name'],
-            workflowid=col['workflowid'],
-            ioType=col['iotype']),
-            split_size=col['mapper_input_size'],
-            axis=0)
-        print(job)
-
-        self.jobQueue[j] = job
-
-
-  """
-
-  def addJobs(self, rack, traceFile):
+  def addJobs(self, rack, traceFile, dataCenter):
     with open(traceFile) as csvFile:
         csvReader = csv.reader(csvFile, delimiter=',', skipinitialspace=True)
         for row in csvReader:
             mapper = math.ceil(float(row[2])/ float(self.mapper_size))
-            print(float(row[2]), str(row[3]))
+            #print(float(row[2]), str(row[3]))
 
-            job = Job(int(row[0]), int(row[0]), mapper, int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), self.mapper_size)
+            job = Job(int(row[0]), int(row[0]), mapper, int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), self.mapper_size, self.chunk_size)
             #job = Job(int(row[0]), int(row[0]), int(float(row[1])), int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), 4 * round((int(float(row[2])) / int(float(row[1])))/4))
             self.jobQueue[rack].append(job)
         #for i in range(len(list(self.jobQueue[rack]))):
         #    print(list(self.jobQueue[rack])[i].__dict__)
+            self.updateKeySet(str(row[3]), int(row[2]), dataCenter)
         self.allocateJob(rack)
 
-  """
-  def addJobs(self, pf, racks):
-    for j in range(racks):
-        df = pf[j]
-        for i in range(len(df.index)):
-            job = Job(i, df.loc[i].user_name, df.loc[i].startTime,  df.loc[i].inputdir,  df.loc[i].mapper,  df.loc[i].workflowid,  df.loc[i].input_size, df.loc[i].mapper_input_size, df.loc[i].iotype)
-            self.jobQueue[j].append(job)
-        self.allocateJob(j)
-  """
+  def updateKeySet(self, objectName, size, dataCenter):
+      for i in range(math.ceil(size/dataCenter.chunk_size)):
+          dataCenter.setKeys.add(objectName+"_"+str(i))
 
   @with_goto
   def allocateJob(self, rack):
@@ -137,7 +112,7 @@ class Scheduler:
       elif (np.count_nonzero(self.slots == 0) >= job.mapper):
       """
       #if (np.count_nonzero(self.slots[rack] == 0) >= job.mapper):
-      if (np.count_nonzero(self.slots[rack] == 0) >= 1):
+      if self.slots[rack] == 0:
 
         self.createTask(rack, job)
         #print("allocate JOB: allocate rack")
@@ -169,31 +144,29 @@ class Scheduler:
     lenght = job.size
     #print("job:", job.__dict__)
     for i in range(job.mapper):
-      #print("i is %s" %i)
-      task_size = job.split_size
-
-      offset = i*job.split_size
-      if( lenght < job.split_size):
-        task_size = lenght;  
-      task = Task(task_id, job, "", rack, 0, offset,  task_size)
-      lenght -= job.split_size
-      task_id +=1
-      job.taskList.append(task)
-      #print("Create TASK ", task.job.__dict__)
+        #print("i is %s" %i)
+        offset = i*job.split_size
+        task_size = job.split_size
+        if( lenght < job.split_size):
+            task_size = lenght;  
+        taskReqCount = task_size/job.chunk_size
+        #print("taskReqCount is: ", taskReqCount)
+        task = Task(task_id, job, "", rack, 0, offset,  task_size, taskReqCount)
+        lenght -= job.split_size
+        task_id +=1
+        job.taskList.append(task)
+        #print("Create TASK ", task.__dict__)
  
   def allocateRack(self, rack, job):
     #print("rack is %s" %rack)
-    free_slots = np.where(self.slots[rack] == 0)
-    #print("FREE SLOTS are %s" %free_slots)
-    #for i in range(len(free_slots)):
 
+    if self.slots[rack] == 1:
+        return
     task = job.taskList.popleft()
-    c = free_slots[0][0]
-      #print("C is %s" %free_slots)
-    job.slot.append([rack,c])
-    self.slots[rack,c] = 1
-    task.mapper_id  = "map"+str(rack)+"-"+str(c)
-    task.cpu  = c
+    #job.slot.append([rack,0])
+    self.slots[rack] = 1
+    task.mapper_id  = "map"+str(rack)+"-"+str(0)
+    task.cpu  = 0
 
     self.mapper_list[task.mapper_id].queue.append(task)
     #print("Allocate RACK: ", task.job.__dict__)

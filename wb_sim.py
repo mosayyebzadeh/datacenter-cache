@@ -5,6 +5,9 @@ from traceParser import *
 from dataCenter import DataCenter 
 from scheduler import Scheduler 
 import timeit
+import cProfile
+import pstats
+import io
 
 if __name__ == '__main__':
   start = timeit.default_timer()
@@ -34,7 +37,8 @@ if __name__ == '__main__':
   #directory = {}
   dc = DataCenter("datacenter1")
   dc.build(config, logger, env) 
-  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, dc.blk_dir, dc.mapper_list, dc.cache_layer, dc.jobStat, dc.mapper_size)
+  #dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, dc.blk_dir, dc.mapper_list, dc.cache_layer, dc.jobStat, dc.mapper_size, dc.chunk_size)
+  dc.scheduler = Scheduler(dc.compute_nodes, dc.cpu, dc.blk_dir, dc.mapper_list, dc.cache_layer, dc.mapper_size, dc.chunk_size)
    
  
   racks = int(config.get('Simulation', 'cache nodes'))
@@ -46,9 +50,9 @@ if __name__ == '__main__':
     trace_file = config.get('Simulation', 'traceFile'+str(i))
     logger.info('Generating Final Trace File...')
     print("Generating Final Trace File...")
-    dc.scheduler.addJobs(i, trace_file) 
+    dc.scheduler.addJobs(i, trace_file, dc) 
     #df[i] = traceParser(trace_file)
-    print(dc.scheduler.jobQueue[i])
+    print(dc.setKeys)
 
   logger.info('Running Simulation')
   print('Running Simulation')
@@ -61,7 +65,7 @@ if __name__ == '__main__':
     pool.add_task(event.request_generator, i, dc, dc.scheduler, env)
 
   """
-  for i in dc.mapper_list.keys():
+  for i in dc.mapper_list:
     event.request_generator(i, dc, dc.scheduler, env)
 
   policy = config.get('Simulation', 'cache policy')
@@ -72,20 +76,25 @@ if __name__ == '__main__':
   #pool.add_task(event.cleanUpDir, dc, env, float(config.get('Directory', 'cleanup interval')))
 
   #pool.wait_completion()
-  env.run(until = config.get('Simulation', 'end'))
-  #env.run()
+  #env.run(until = config.get('Simulation', 'end'))
+
   """
-  sort_by_ctime = dc.blk_dir.df.sort_values('c_time',ascending=False) 
-  print('---------sorted--------------')
-  print(sort_by_ctime)
-  print('---------jobs--------------')
-  print(dc.jobStat.df)
-  print('----------wb-cache----------')
-  print(dc.blk_dir.obj_df.sort_values('c_time',ascending=False))
-  print('----------osd-mapping----------')
-  print(dc.osdMap)
-  print('----------print cache----------')
+  pr = cProfile.Profile()
+  pr.enable()
+
+  env.run()
+
+  pr.disable()
+  s = io.StringIO()
+  ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
+  ps.print_stats()
+
+  with open('40000.txt', 'w+') as f:
+    f.write(s.getvalue())
+
   """
+  env.run()
+
   print('----------Datalake ----------')
   print("Datalake access is %s" %(dc.dl_access))
   hit_count = 0

@@ -1,6 +1,7 @@
 from lru import LRU
 import queue
-#"""Class representing wb-cache"""
+from timer import Timer
+
 class Cache:
 
   # Replacement policies
@@ -10,14 +11,14 @@ class Cache:
   LFUL = 'LFUL'
   LFUG = 'LFUG'
 
-  def __init__(self, name, size, policy, interval):
+  def __init__(self, name, size, policy, interval, setKeys):
     self.name = name
     self.size = size
     self.interval = interval
     self.free_space = size
     self.policy = policy # Eviction policy
-    self.hashmap = {} # Mapping <objname,objsize>
     self.taskCount = 0
+    self.cacheTimer = Timer()
 
     if (self.policy == Cache.LRU):
       self.cache = LRU(self.size)
@@ -26,7 +27,9 @@ class Cache:
     elif (self.policy == Cache.LFUG):
       self.cache = {}
     elif (self.policy == Cache.LORE):
-      self.cache = {}
+      value = {"size": 0, "lfreq":0, "location":set()}
+      self.cache = dict.fromkeys(setKeys, value)
+      self.cache.update(dict(self.cache))
     elif (self.policy == Cache.FIFO):
        self.cache = queue.Queue(maxsize=self.size)
 
@@ -39,16 +42,20 @@ class Cache:
     self.remote_miss = 0
 
   def has_key(self, key):
-    if key in self.hashmap.keys():
+    if key in self.cache:
       return True
     else:
       return False
 
-  def put(self, key, size, time, dataCenter):
-    if self.has_key(key):
-      self.update(key,size, time, dataCenter)
+  def put(self, key, size, dataCenter):
+    #if self.has_key(key):
+    #print("cache put")
+    #self.cacheTimer.start()
+    if key in self.cache:
+      self.update(key,size, dataCenter)
     else:  
-      self.insert(key, size, time, dataCenter)
+      self.insert(key, size, dataCenter)
+    #self.cacheTimer.stop()
     """
     print("*********************")
     self.print()
@@ -56,125 +63,107 @@ class Cache:
     print("#####################")
     """
 
-  def update(self,key,size, time, dc):
-    self.hashmap[key] = size
+  def update(self,key,size, dc):
     self.hit_count += 1;    
-    #print("AMIN: Update %s key is %s" %(self.name, key))
     if (self.policy == Cache.LRU):
         value = self.cache[key]
-        locations = value["location"]
-        if self.name not in locations:
-            locations.append(self.name)
-        value = {"size": size, "lfreq":1, "location":locations, "time":0}
-        self.cache[key] = value
+        #print("key is ", key, "LRU VALUE before update", self.cache[key])
+        #locations = self.cache[key].["location"]
+        #locations.append(self.name)
+        #value = {"size": size, "lfreq":1, "location":locations, "time":0}
+        #value = {"size": size,"location":locations}
+        #self.cache[key]["location"].add(self.name)
+        #print("key is ", key, "LRU VALUE after update" , self.cache[key])
 
-    elif (self.policy == Cache.LFUL):
-        value = self.cache[key]
-        lfreq = value["lfreq"] + 1
-        locations = value["location"]
-        if self.name not in locations:
-            locations.append(self.name)
-        value = {"size": size, "lfreq":lfreq, "location":locations, "time":time}
-        self.cache.update({key: value})
+    if (self.policy == Cache.LFUL):
+        #value = self.cache[key]
+        #lfreq = value["lfreq"] + 1
+        #locations = value["location"]
+        #if self.name not in locations:
+        #    locations.append(self.name)
+        #value = {"size": size, "lfreq":lfreq, "location":locations, "time":time}
+        self.cache[key]["lfreq"] += 1
 
     elif (self.policy == Cache.LFUG):
-        dc.blk_dir.put(key, size, self.name, time)
+        dc.blk_dir.put(key, size, self.name)
 
     elif (self.policy == Cache.LORE):
         value = self.cache[key]
-        lfreq = value["lfreq"] + 1
-        locations = value["location"]
-        if self.name not in locations:
-            locations.append(self.name)
-        value = {"size": size, "lfreq":lfreq, "location":locations, "time":time}
-        self.cache.update({key: value})
-        dc.blk_dir.updateTime(key, time)
+        value["size"] = size
+        value["location"].add(self.name)
+        value["lfreq"] += 1
+        self.cache[key] = value
+
+
     elif (self.policy == Cache.FIFO):
         self.cache.put(key)
 
-  def insert(self, key, size, time, dc):
+  def insert(self, key, size, dc):
     if (self.policy == Cache.LRU):
       self.insertLRU(key, size)
     elif (self.policy == Cache.LFUL):
-      self.insertLFUL(key, size, time)
+      self.insertLFUL(key, size)
     elif (self.policy == Cache.LFUG):
-      self.insertLFUG(key, size, time, dc)
+      self.insertLFUG(key, size)
     elif (self.policy == Cache.LORE):
-      self.insertLORE(key, size, time, dc)
+      self.insertLORE(key, size, dc)
     elif (self.policy == Cache.FIFO):
-      self.insertFIFO(key, size, dc)
+      self.insertFIFO(key, size)
 
  
   def insertLRU(self, key, size):
     while(int(size) > self.free_space):
       self.evictLRU()
-    lfreq = 1
-    value = {"size": size, "lfreq":1, "location":self.name, "time":0}
-    self.cache[key] = value
-    self.hashmap[key] = size
+    #lfreq = 1
+    #value = {"size": size, "location":{self.name}}
+    self.cache[key] = size
     self.free_space -= size
-    #self.miss_count +=1
 
-  def insertLFUL(self, key, size, time):
+  def insertLFUL(self, key, size):
     while(int(size) > self.free_space):
         self.evictLFUL()
-    value = {"size": size, "lfreq":1, "location":self.name, "time":time}
-    self.cache.update({key: value})
-    self.hashmap[key] = size
+    value = {"size": size, "lfreq": 1}
+    self.cache[key] = value
     self.free_space -= size
-    #self.miss_count +=1
 
-  def insertLFUG(self, key, size, time, dc):
+  def insertLFUG(self, key, size):
     while(int(size) > self.free_space):
-        self.evictLFUG(dc)
-    value = {"size": size, "lfreq":1, "location":self.name, "time":time}
+        self.evictLFUG()
+    value = {"size": size, "location":{self.name}}
     self.cache.update({key: value})
-    #print("AMIN: INSERTLORE Key is %s and value is %s" %(key, value))
-    self.hashmap[key] = size
-    dc.blk_dir.put(key, size, self.name, time)
+    directory.put(key, size, self.name)
     self.free_space -= size
-    #self.miss_count +=1
 
-  #value is a dictionary (size, lfreq, location, time)
-  def insertLORE(self, key, size, time, dc):
-    #print("AMIN: size is %d and free_space is %d" %(int(size), self.free_space))
-    #print("AMIN: Insert %s key is %s" %(self.name, key))
+  #value is a dictionary (size, lfreq, location)
+  def insertLORE(self, key, size, dc):
     while(int(size) > self.free_space):
         if not self.evictLORE(key, dc):
             return
-    value = {"size": size, "lfreq":1, "location":self.name, "time":time}
+    value = {"size": size, "lfreq":1, "location":{self.name}}
     self.cache.update({key: value})
-    #print("AMIN: INSERTLORE Key is %s and value is %s" %(key, value))
-    self.hashmap[key] = size
-    dc.blk_dir.put(key, size, self.name, time)
+    dc.blk_dir.put(key, size, self.name)
     self.free_space -= size
-    #self.miss_count +=1
 
-  def insertFIFO(self, key, size, dc):
+  def insertFIFO(self, key, size):
     while(int(size) >= self.free_space):
-        self.evictFIFO(dc)
+        self.evictFIFO()
     self.cache.put(key)
-    self.hashmap[key] = size
     self.free_space -= size
-    #self.miss_count +=1
 
   def evictLRU(self):
     oid = self.cache.peek_last_item()[0]
-    self.free_space += int(self.hashmap[oid])
-    del self.hashmap[oid]     
+    self.free_space += int(self.cache[oid])
     del self.cache[oid]
 
   def evictLFUL(self):
     keyMin = min(self.cache, key= lambda x: self.cache[x]['lfreq'])
-    self.free_space += int(self.hashmap[keyMin])
-    del self.hashmap[keyMin]     
+    self.free_space += int(self.cache[keyMin]['size'])
     del self.cache[keyMin]
 
   #FIXME: we need to make sure the found key is present in the local cache
-  def evictLFUG(self, dc):
+  def evictLFUG(self):
       #if Keymin = min(directory, key= lambda x: directory[x]['gfreq']) in self.cache.keys():
-        self.free_space += int(self.hashmap[keymin])
-        del self.hashmap[keymin]     
+        self.free_space += int(self.cache[oid]['size'])
         del self.cache[keymin]
 
   #FIXME: this should implement gfreq and lfreq parts.
@@ -184,47 +173,31 @@ class Cache:
     mingfreq = 0
     evictKey = ""
     lastCandidKey = ""
-    #print("EvictLORE key to be inserted is %s" %key)
-    #print("EvictLORE %s before keys are %s" %(self.name, self.cache.items()))
-    #print("EvictLORE DIRECTORY is %s" %directory.dict.keys())
-    if (not directory.haskey(key)) or directory.dict[key]['valid'] == 0:
-        for candidKey in self.cache.keys():
-            #print("AMIN: candid key is %s" %candidKey)
+    if (key not in directory.dict) or directory.dict[key]['valid'] == 0:
+        for candidKey in self.cache:
             value = self.cache[candidKey]
             lfreq = value["lfreq"]
-            #print("AMIN: lfreq for candid key %s is %d" %(evictKey, lfreq))
             if lfreq < minlfreq:
                 minlfreq = lfreq
-                #print("AMIN: 1")
                 lastCandidKey = candidKey
-                #print("key is %s, evict key is %s, last candid Key is %s" %(key, evictKey, lastCandidKey))
                 if (directory.dict[candidKey]['gfreq'] == 0) or (len(directory.dict[candidKey]['location']) > 1):
-                    #print("AMIN: inside the conditions ---------------->")
                     evictKey = candidKey
-                    #print("AMIN: evict key1 is %s" %evictKey)
         if evictKey == "":
-            #print("AMIN: evict key is empty")
             evictKey = lastCandidKey
-            #print("AMIN: evict key is %s" %evictKey)
-            self.moveToRemoteLORE(evictKey, directory.dict[evictKey]['size'], directory.dict[evictKey]['la_time'], dc)
+            self.moveToRemoteLORE(evictKey, directory.dict[evictKey]['size'], dc)
     else:
-        #print("AMIN: cached some where")
-        for candidKey in self.cache.keys():
+        for candidKey in self.cache:
             value = self.cache[candidKey]
             lfreq = value["lfreq"]
-            #print("AMIN: lfreq for candid key %s is %d" %(evictKey, lfreq))
             if lfreq < minlfreq:
                 minlfreq = lfreq
-                #print("AMIN: 2")
                 if (directory.dict[candidKey]['gfreq'] == 0) or (len(directory.dict[candidKey]['location']) > 1):
                     evictKey = candidKey
-                    #print("AMIN: evict key2 is %s" %evictKey)
 
     if evictKey != "":
         #print("AMIN: evict key is not empty and is %s" %evictKey)
-        self.free_space += int(self.hashmap[evictKey])
+        self.free_space += int(self.cache[evictKey]['size'])
         directory.removeBlock(evictKey, self.name)
-        del self.hashmap[evictKey]
         del self.cache[evictKey]
         #print("AMIN: EvictLORE keys after the evict is are %s" %self.cache.keys())
         return True
@@ -233,65 +206,45 @@ class Cache:
         return False
 
 
-  def evictFIFO(self, dc):
+  def evictFIFO(self):
     oid = self.cache.get()
-    dc.blk_dir.removeBlock(oid, self.name)
-    self.free_space += int(self.hashmap[oid])
-    del self.hashmap[oid]     
+    #directory.removeBlock(oid, self.name)
+    self.free_space += int(self.cache[oid]['size'])
 
 
 
-  def moveToRemoteLORE(self, evictKey, size, time, dc):
-      for i in dc.cache_layer.keys():
+  def moveToRemoteLORE(self, evictKey, size, dc):
+      for i in dc.cache_layer:
           if dc.cache_layer[i].free_space >= dc.cache_layer[i].size/2:
-              if not dc.cache_layer[i].has_key(evictKey):
-                dc.cache_layer[i].insertLORE(evictKey, size, time, dc)
+              if evictKey not in dc.cache_layer[i]:
+                dc.cache_layer[i].insertLORE(evictKey, size, dc)
                 #print("LORE: Remote cache is %s" %i)
                 return
 
 
   def halve_lfreq(self):
-    for key in self.cache.keys():
-      value = self.cache[key]
+    for key in self.cache:
+      """
+      value = self.cache[key]["lfreq"]/2 
       lfreq = value["lfreq"]
       value["lfreq"] = int(lfreq/2)
       self.cache[key] = value
-
-  """
-  def halve_freq(self, directory, time):
-    #print("AMIN: HALVE_FREQ time is %s" %time)
-    self.halve_lfreq(time)
-    for key in directory.df.index:
-      owner = directory.get_owner(key)
-      if owner == self.name:
-        directory.halve_gfreq(key)
-
-  def halve_lfreq(self, key):
-    for key in self.cache.keys():
-      value = self.cache[key]
-      #print("AMIN: HALVE_LLLLFREQ: %s key is %s value[lfreq] is %s" %(self.name, key, value["lfreq"]))
-      lfreq = value["lfreq"]
-      value["lfreq"] = int(lfreq/2)
-      self.cache[key] = value
-      #print("AMIN: HALVE_LLLLFREQ2: %s key is %s value[lfreq] is %d cache[lfreq] is %d" %(self.name, key, value["lfreq"], self.cache[key]["lfreq"]))
-  """
-
-
+      """
+      self.cache[key]["lfreq"] /= 2
 
   def print(self):
     if (self.policy == Cache.LRU):
-      print(self.name, "LRU", self.hashmap, self.cache.items())
+      print(self.name, "LRU", self.cache.items())
     elif (self.policy == Cache.LORE):
-      print(self.name, "LORE", self.hashmap)
+      print(self.name, "LORE", self.cache.items())
     elif (self.policy == Cache.FIFO):
-      print(self.name, "LRU", self.hashmap, list(self.cache.queue))
+      print(self.name, "FIFO", list(self.cache.queue))
 
   def remove(self,key, directory):
-    del self.hashmap[key]
     if (self.policy == Cache.LRU):
       del self.cache[key]
     if (self.policy == Cache.LORE):
       del self.cache[key]
       directory.remove_block_entry(key)
     elif (self.policy == Cache.FIFO):
-      a=5
+      del self.cache[key]

@@ -2,9 +2,10 @@ from uhashring import HashRing
 from cache import Cache
 from directory import Directory
 import simpy, re, random, threading
-import pandas as pd
+#import pandas as pd
 from collections import deque
 from stats import JobStat
+from timer import Timer
 
 class Mapper:
   def __init__(self, name):
@@ -42,7 +43,7 @@ class DataCenter:
     self.placement = None 
     self.logger = None
     self.blk_dir = Directory('blk_dir')
-    self.jobStat = JobStat()
+    #self.jobStat = JobStat()
     self.hash_ring = None
     self.nic_count = 0
     self.scheduler = None
@@ -54,6 +55,11 @@ class DataCenter:
     self.osdMap = None  
     self.dl_access = 0 
     self.outstanding_req = {}
+    self.jobDoneCount = 0
+    self.printCount = 0
+    self.setKeys = set()
+    self.timer = Timer()
+    self.timer.start()
 #    self.outstanding_delete_op = {}
 
   def build_directory(self):
@@ -68,14 +74,14 @@ class DataCenter:
     #self.blk_dir.df = pd.DataFrame(columns = col_names)
     #self.blk_dir.df = self.blk_dir.df.set_index(['blkname'])
     
-    col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'gfreq', 'valid', 'la_time']
-    self.blk_dir.obj_df = pd.DataFrame(columns = col_names)
-    self.blk_dir.obj_df = self.blk_dir.obj_df.set_index(['objname'])
+    #col_names = ['objname', 'c_time', 'size', 'location', 'owner', 'gfreq', 'valid', 'la_time']
+    #self.blk_dir.obj_df = pd.DataFrame(columns = col_names)
+    #self.blk_dir.obj_df = self.blk_dir.obj_df.set_index(['objname'])
 
-    print('Building osd mapping for write cache')
-    col_names = ['blkname', 'osd_list', 'dirty']
-    self.osdMap = pd.DataFrame(columns = col_names)
-    self.osdMap = self.osdMap.set_index(['blkname'])
+    #print('Building osd mapping for write cache')
+    #col_names = ['blkname', 'osd_list', 'dirty']
+    #self.osdMap = pd.DataFrame(columns = col_names)
+    #self.osdMap = self.osdMap.set_index(['blkname'])
 
   def build_worker_nodes(self):
    for r in range(self.compute_nodes):
@@ -152,7 +158,7 @@ class DataCenter:
 
     for i in range(self.c_nodes):
       c_name = "cache"+str(i) #i is rack id
-      self.cache_layer[c_name]=Cache(c_name, size, policy, self.interval)
+      self.cache_layer[c_name]=Cache(c_name, size, policy, self.interval, self.setKeys)
     
     #c_name = 'writeCache'
     #self.cache_layer[c_name]=Cache(c_name, size, 'FIFO', self.interval)

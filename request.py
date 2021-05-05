@@ -41,3 +41,13 @@ class Request:
                 return self.dest
         def get_info(self):
                 return self.info
+        """
+        def __copy__(self):
+            copy_object = Request()
+            return copy_object
+
+        def __deepcopy__(self, memodict={}):
+            copy_object = Request()
+            copy_object.value = self.value
+            return copy_object
+        """
