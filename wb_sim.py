@@ -52,7 +52,7 @@ if __name__ == '__main__':
     print("Generating Final Trace File...")
     dc.scheduler.addJobs(i, trace_file, dc) 
     #df[i] = traceParser(trace_file)
-    print(dc.setKeys)
+    #print(dc.setKeys)
 
   logger.info('Running Simulation')
   print('Running Simulation')

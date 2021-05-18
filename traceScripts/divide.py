@@ -13,7 +13,7 @@ for i in range(int(outputFileCount)):
 
 i = 0
 with open(traceFile) as csvFile:
-    csvReader = csv.reader(csvFile, delimiter=',', skipinitialspace=True)
+    csvReader = csv.reader(csvFile, delimiter=' ', skipinitialspace=True)
  
     for row in csvReader:
         if int(float(row[2])/1048576) == 0:

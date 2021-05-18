@@ -22,10 +22,10 @@ class Directory:
     #self.dirTimer.start()
     if key in self.dict:
         value = self.dict[key]
-        value['valid'] = 1 # update global access freq
+        #value['valid'] = 1 # update global access freq
         value['location'].add(location)
     else:
-        value = {'size': size, 'location': {location}, 'gfreq': 1, 'valid': 1}
+        value = {'size': size, 'location': {location}, 'gfreq': 1}
     self.dict.update({key: value}) 
     self.free_space -= 1
     #self.dirTimer.stop()
@@ -46,16 +46,16 @@ class Directory:
     value = self.dict[key]
     loc = value['location']
     if len(loc) == 1: #final copy
-        value['valid'] = 0
-        #loc = {""}
-        loc.remove(location)
-        value['location'] = loc
+        #value['valid'] = 0
+        #loc.remove(location)
+        #value['location'] = loc
+        del self.dict[key]
 
     else:
         loc.remove(location)
         value['location'] = loc
 
-    self.dict.update({key: value}) #There is no cache having the data
+        self.dict.update({key: value}) #There is no cache having the data
     #self.dirTimer.stop()
 
 
@@ -82,7 +82,7 @@ class Directory:
     #print('AMIN remove entry keys are: %s' %self.df.index)
     if (self.size - self.free_space >= self.threshold):
       for key in self.dict:
-        if self.dict[key]['valid'] == 0:
+        if len(self.dict[key]['location']) == 0:
           #print('AMIN remove entry: found an invalid key: %s' %key)
           del self.dict[key]
           self.free_space += 1

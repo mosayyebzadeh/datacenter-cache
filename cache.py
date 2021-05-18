@@ -27,9 +27,10 @@ class Cache:
     elif (self.policy == Cache.LFUG):
       self.cache = {}
     elif (self.policy == Cache.LORE):
-      value = {"size": 0, "lfreq":0, "location":set()}
-      self.cache = dict.fromkeys(setKeys, value)
-      self.cache.update(dict(self.cache))
+      #value = {"size": 0, "lfreq":0, "location":set()}
+      #self.cache = dict.fromkeys(setKeys, value)
+      #self.cache.update(dict(self.cache))
+      self.cache = {}
     elif (self.policy == Cache.FIFO):
        self.cache = queue.Queue(maxsize=self.size)
 
@@ -88,11 +89,12 @@ class Cache:
         dc.blk_dir.put(key, size, self.name)
 
     elif (self.policy == Cache.LORE):
-        value = self.cache[key]
-        value["size"] = size
-        value["location"].add(self.name)
-        value["lfreq"] += 1
-        self.cache[key] = value
+        #value = self.cache[key]
+        #value["size"] = size
+        #value["location"].add(self.name)
+        #value["lfreq"] += 1
+        #self.cache[key] = value
+        self.cache[key]["lfreq"] += 1
 
 
     elif (self.policy == Cache.FIFO):
@@ -129,7 +131,7 @@ class Cache:
   def insertLFUG(self, key, size):
     while(int(size) > self.free_space):
         self.evictLFUG()
-    value = {"size": size, "location":{self.name}}
+    value = {"size": size}
     self.cache.update({key: value})
     directory.put(key, size, self.name)
     self.free_space -= size
@@ -139,7 +141,7 @@ class Cache:
     while(int(size) > self.free_space):
         if not self.evictLORE(key, dc):
             return
-    value = {"size": size, "lfreq":1, "location":{self.name}}
+    value = {"size": size, "lfreq":1}
     self.cache.update({key: value})
     dc.blk_dir.put(key, size, self.name)
     self.free_space -= size
@@ -173,25 +175,27 @@ class Cache:
     mingfreq = 0
     evictKey = ""
     lastCandidKey = ""
-    if (key not in directory.dict) or directory.dict[key]['valid'] == 0:
+    if (key not in directory.dict): #or directory.dict[key]['valid'] == 0:
         for candidKey in self.cache:
             value = self.cache[candidKey]
             lfreq = value["lfreq"]
             if lfreq < minlfreq:
                 minlfreq = lfreq
                 lastCandidKey = candidKey
-                if (directory.dict[candidKey]['gfreq'] == 0) or (len(directory.dict[candidKey]['location']) > 1):
+                lastCandidKeyValue = directory.dict[candidKey]
+                if (lastCandidKeyValue['gfreq'] == 0) or (len(lastCandidKeyValue['location']) > 1):
                     evictKey = candidKey
         if evictKey == "":
             evictKey = lastCandidKey
-            self.moveToRemoteLORE(evictKey, directory.dict[evictKey]['size'], dc)
+            self.moveToRemoteLORE(evictKey, lastCandidKeyValue['size'], dc)
     else:
         for candidKey in self.cache:
             value = self.cache[candidKey]
             lfreq = value["lfreq"]
             if lfreq < minlfreq:
                 minlfreq = lfreq
-                if (directory.dict[candidKey]['gfreq'] == 0) or (len(directory.dict[candidKey]['location']) > 1):
+                candidKeyvalue = directory.dict[candidKey]
+                if (candidKeyvalue == 0) or (len(candidKeyvalue['location']) > 1):
                     evictKey = candidKey
 
     if evictKey != "":

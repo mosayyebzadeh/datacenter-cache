@@ -84,9 +84,7 @@ class Scheduler:
             job = Job(int(row[0]), int(row[0]), mapper, int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), self.mapper_size, self.chunk_size)
             #job = Job(int(row[0]), int(row[0]), int(float(row[1])), int(float(row[2])), str(row[3]), str(row[4]), str(row[5]), str(row[6]), 4 * round((int(float(row[2])) / int(float(row[1])))/4))
             self.jobQueue[rack].append(job)
-        #for i in range(len(list(self.jobQueue[rack]))):
-        #    print(list(self.jobQueue[rack])[i].__dict__)
-            self.updateKeySet(str(row[3]), int(row[2]), dataCenter)
+            #self.updateKeySet(str(row[3]), int(row[2]), dataCenter)
         self.allocateJob(rack)
 
   def updateKeySet(self, objectName, size, dataCenter):
