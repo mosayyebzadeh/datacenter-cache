@@ -60,6 +60,7 @@ class DataCenter:
     self.setKeys = set()
     self.timer = Timer()
     self.timer.start()
+    self.globalAge = 0
 #    self.outstanding_delete_op = {}
 
   def build_directory(self):
@@ -99,27 +100,53 @@ class DataCenter:
     nic_count =  int(self.config.get('Network', 'nic count'))
     self.nic_count = nic_count
     #print("nic COUNt is %d" %nic_count)
+    coef = 1
+    speed_unit = self.config.get('Network', 'unit')
+    if speed_unit == 'Gbps':
+        coef = 1024/8 # based on MB
+        #coef = 1024*1024*1024
+    elif speed_unit == 'Mbps':
+        coef = 1
+        #coef = 1024*1024
+    elif speed_unit == 'Kbps':
+        coef = 1024/8
+    elif speed_unit == 'Bps':
+        coef = 1
+
+
     for i in range(self.c_nodes):
       for j in range (nic_count-1):
         nic_id = "nic"+str(j)+" in"
         link_id = "nic"+str(j)+".in."+str(i)
-        speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000
+        speed = float(self.config.get('Network', nic_id))*coef
+        #speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000
         links[link_id]=simpy.Container(env, speed, init=speed)
         
         nic_id = "nic"+str(j)+" out"
         link_id = "nic"+str(j)+".out."+str(i)
-        speed = float(self.config.get('Network',nic_id).split("G")[0])/8*1000*1000*1000
+        speed = float(self.config.get('Network', nic_id))*coef
+        #speed = float(self.config.get('Network',nic_id).split("G")[0])/8*1000*1000*1000
         links[link_id]=simpy.Container(env, speed, init=speed)
     
     #DL link
-    nic_id = "nic"+str(nic_count-1)+" in"
+    #nic_id = "nic"+str(nic_count-1)+" in"
+    #link_id = "nic"+str(nic_count-1)+".in" 
+    #speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000 
+    nic_id = "dl"+" nic"+str(nic_count-1)+" in"
     link_id = "nic"+str(nic_count-1)+".in" 
-    speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000 
+
+    speed = float(self.config.get('Network', nic_id))*coef
+
     links[link_id]=simpy.Container(env, speed, init=speed)
     
-    nic_id = "nic"+str(nic_count-1)+" out"
+    #nic_id = "nic"+str(nic_count-1)+" out"
+    #link_id = "nic"+str(nic_count-1)+".out" 
+    #speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000 
+    nic_id = "dl"+ " nic"+str(nic_count-1)+" out"
     link_id = "nic"+str(nic_count-1)+".out" 
-    speed = float(self.config.get('Network', nic_id).split("G")[0])/8*1000*1000*1000 
+
+    speed = float(self.config.get('Network', nic_id))*coef
+
     links[link_id]=simpy.Container(env, speed, init=speed)
   
     #print("LINKS ARE %s" %links)
@@ -137,6 +164,11 @@ class DataCenter:
     self.cpu = int(config.get('Simulation', 'cpu'))
     self.chunk_size = int(config.get('Simulation', 'chunk size')) # in MB
     self.mapper_size = int(config.get('Simulation', 'mapper size')) # in MB
+
+    self.logFile = config.get('Simulation', 'log file')
+    f = open(self.logFile, "w")
+    f.close()
+
     self.logger = logger
     if (self.placement == "consistent"):
       self.hash_ring = consistentHashing(self.c_nodes)

@@ -98,18 +98,39 @@ if __name__ == '__main__':
   print('----------Datalake ----------')
   print("Datalake access is %s" %(dc.dl_access))
   hit_count = 0
+  hit_size_count = 0
   miss_count = 0
+  miss_size_count = 0
+  local_count = 0
+  local_size_count = 0
+  remote_count = 0
+  remote_size_count = 0
   for i in range(dc.c_nodes):
     c_name = "cache"+str(i) #i is rack id
-    hit_count += dc.cache_layer[c_name].hit_count
+    #hit_count += dc.cache_layer[c_name].hit_count
+    local_count += dc.cache_layer[c_name].local_hit
+    local_size_count += dc.cache_layer[c_name].local_size_hit
+    remote_count += dc.cache_layer[c_name].remote_hit
+    remote_size_count += dc.cache_layer[c_name].remote_size_hit
     miss_count += dc.cache_layer[c_name].miss_count
-    print("HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].hit_count))
+    miss_size_count += dc.cache_layer[c_name].miss_size_count
+    #print("HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].hit_count))
     print("Local HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].local_hit))
+    print("Local BYTE HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].local_size_hit))
     print("Remote HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].remote_hit))
+    print("Remote BYTE HIT COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].remote_size_hit))
     print("MISS COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].miss_count))
+    print("BYTE MISS COUNT for cache %s is %s" %( c_name, dc.cache_layer[c_name].miss_size_count))
     #dc.cache_layer[c_name].print()
-  print("Total Hit count is %d" %hit_count)
-  print("Total Miss count is %d" %miss_count)
+  print("Total Object Hit count is %d" %(local_count+remote_count))
+  print("Total BYTE Hit count is %d" %(local_size_count+remote_size_count))
+  print("Total Local Object Hit count is %d" %local_count)
+  print("Total Local BYTE Hit count is %d" %local_size_count)
+  print("Total Remote Object Hit count is %d" %remote_count)
+  print("Total Remote BYTE Hit count is %d" %remote_size_count)
+  print("Total Object Miss count is %d" %miss_count)
+  print("Total BYTE Miss count is %d" %miss_size_count)
+  print("Runtime is: ", dc.scheduler.endTime)
   stop = timeit.default_timer()
   print('Time: ', stop - start)
 #  s_thread.join()

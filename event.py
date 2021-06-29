@@ -6,13 +6,22 @@ from timer import Timer
 
 
 def printCacheStats(dc):
+    f = open(dc.logFile, "a")
     print("-------Cache-------")
     d = dc.blk_dir.dict
     for k in dc.cache_layer.keys():
-        print(dc.cache_layer[k].name, list(dc.cache_layer[k].cache.keys()) )
+        if dc.cache_layer[k].policy == Cache.LFUD or dc.cache_layer[k].policy == Cache.LFUDA or dc.cache_layer[k].policy == Cache.LFUL:
+            print(dc.cache_layer[k].name, list(dc.cache_layer[k].cache.cache.keys()) )
+            f.write("%s %s\n" %(dc.cache_layer[k].name, list(dc.cache_layer[k].cache.cache.keys())))
+            for key in dc.cache_layer[k].cache.cache.keys():
+                print(dc.cache_layer[k].cache.cache[key].freq_node.freq)
+        else:
+            print(dc.cache_layer[k].name, list(dc.cache_layer[k].cache.keys()) )
+            f.write("%s %s\n" %(dc.cache_layer[k].name, list(dc.cache_layer[k].cache.keys())))
     for k in d.keys():
         print(k, d[k]['gfreq'], d[k]['location'])
-        #print(k, d[k]['gfreq'], d[k]['location'], d[k]['valid'])
+        print(k, d[k]['gfreq'], d[k]['location'], d[k]['valid'])
+    f.close()
 
 def runMappers(dc, scheduler, env):
   for i in dc.mapper_list.keys():
@@ -32,7 +41,7 @@ def completion(req_old, dc, env):
   #if (dc.mapper_list[req.mapper_id].outstanding_req == req.task.reqCount ): # task is done, release mapper
   if (dc.mapper_list[req.mapper_id].outstanding_req == req.task.taskReqCount ): # task is done, release mapper
     #printCacheStats(dc)
-    dc.mapper_list[req.mapper_id].outstanding_task.remove(req.task.task_id)
+    #dc.mapper_list[req.mapper_id].outstanding_task.remove(req.task.task_id)
     dc.scheduler.slots[req.task.rack] = 0
     dc.mapper_list[req.mapper_id].outstanding_req = 0
     #dc.lock.acquire()
@@ -50,6 +59,7 @@ def completion(req_old, dc, env):
     else:
         #for rack in range(dc.c_nodes):
         dc.jobDoneCount += 1
+        dc.scheduler.endTime = finishTime      
         
         if dc.jobDoneCount % 1000 == 0:
             #dc.timer.stop()
@@ -79,17 +89,20 @@ def forwardRequest(req, dc, env):
     if dc.blk_dir.haskey(req.name):
       locations = dc.blk_dir.dict[req.name]['location']
       if len(locations) > 0:
-      #print("forward Event1:", req.name, req.path)  
+          #print("forward Event1:", req.name, req.path)  
           dest =  next(iter(locations))
           #dest = dc.blk_dir.get_location(req.name) #
           req.path.append(dest)
           if dc.cache_layer[dest].has_key(req.name):
             dc.cache_layer[dest].update(req.name, req.size, dc)
             dc.cache_layer[dest].remote_hit +=1
-            dc.blk_dir.updateGFreq(req.name)
+            dc.cache_layer[dest].remote_size_hit +=req.size
+            if dc.cache_layer[dest].policy != Cache.LFUDA:
+                dc.blk_dir.updateGFreq(req.name)
             return
     req.path.append("DL")
     dc.cache_layer[req.dest].miss_count +=1
+    dc.cache_layer[req.dest].miss_size_count +=req.size
     dc.datalake_access()
 
 
@@ -104,23 +117,26 @@ def readReqEvent(req, dc, env):
   if dc.cache_layer[req.dest].has_key(req.name): # Local Cache Hit
     dc.cache_layer[req.dest].update(req.name, req.size, dc)
     dc.cache_layer[req.dest].local_hit +=1
-    dc.blk_dir.updateGFreq(req.name)
+    dc.cache_layer[req.dest].local_size_hit += req.size
+
+    if dc.cache_layer[req.dest].policy != Cache.LFUDA:
+        dc.blk_dir.updateGFreq(req.name)
     #dc.blk_dir.put(req.name, req.size, req.dest, env.now)
   else:
     forwardRequest(req, dc, env) 
-  readResponse(req, dc, env)
+  #readResponse(req, dc, env)
   #print("%s: Read event path is %s" %(req.name, req.path))
-  #generate_event(req, dc, env, 'readResponse')
+  generate_event(req, dc, env, 'readResponse')
 
-#def readResponseEvent(req, dc, env, links):
-def readResponse(req, dc, env):
+def readResponseEvent(req, dc, env, links):
+#def readResponse(req, dc, env):
     #yield env.timeout(0)
     source, dest = req.path[-1], req.path[-2]
     req.path.pop(len(req.path)-1) 
     # Get the required amount of Bandwidth
 
     latency = 0
-    """
+    
     sLink, dLink = dc.get_link_id(source, dest)
     if sLink:
       yield links[sLink].get(links[sLink].capacity)
@@ -135,16 +151,16 @@ def readResponse(req, dc, env):
       yield links[sLink].put(links[sLink].capacity)
     if dLink:
       yield links[dLink].put(links[dLink].capacity)
-    """
+    
 
     if (len(req.path) >= 2):
       #print("PATH is longer than 2", req.path)
 #      if req.name not in dc.cache_layer[dest].hashmap.keys():
-      dc.cache_layer[req.dest].insert(req.name, req.size, dc)
+      dc.cache_layer[req.dest].put(req.name, req.size, dc)
       #dc.blk_dir.put(req.name, req.size, dest, env.now)
-      readResponse(req, dc, env)
+      #readResponse(req, dc, env)
       #print("%s: ReadResponse event 2 is %s, path is %s" %(req.name, req.job.objname, req.path))
-      #generate_event(req, dc, env, "readResponse")
+      generate_event(req, dc, env, "readResponse")
       #print("%s: ReadResponse event 3 is %s, path is %s" %(req.name, req.job.objname, req.path))
       
     else:
@@ -188,42 +204,37 @@ def generate_event(req_old, dc, env, event_type):
   #print("Generate event:", req.name, req.rtype, req.path)  
   if req.rtype == "read":
     event = env.process(readReqEvent(req, dc, env))
-  """
   elif req.rtype == "readResponse":
     #print("%s: Generated RESPONSE event is %s, path is %s" %(env.now, req.job.objname, req.path))
     env.process(readResponseEvent(req, dc, env, dc.links))
-  """
 
 def request_generator(mapper_id, dc, scheduler, env):
   q = dc.mapper_list[mapper_id].queue
   if q:
-    if not dc.mapper_list[mapper_id].outstanding_task:
+      #for elem in list(q):
+      #  print("queue elemnt is: ", elem.task_id)  
+    #if not dc.mapper_list[mapper_id].outstanding_task:
       task = q.popleft()
-      #dc.lock.acquire()
-      #if not (task.job.jid in dc.jobStat.df.index):
-      #  dc.jobStat.insert(task.job.jid, task.job, env.now) # for job stats
-      dc.mapper_list[mapper_id].outstanding_task.append(task.task_id)
-      #dc.lock.release()
-#      print("testing", task.offset, task.offset + task.lenght,  task.__dict__)
-      for i in range(task.offset, task.offset + task.lenght, dc.chunk_size):
-        destination = "cache"+str(task.rack)
-        source = task.mapper_id
-        path = [source,destination]
-        req_offset = i
-        req_size = dc.chunk_size
-        scheduler.rid.increment()
-        req_id = scheduler.rid.value()
-        #dc.lock.acquire()
-        dc.outstanding_req[req_id] = [True, task.job.jid]
-        #dc.lock.release()
-        req = Request(req_id, mapper_id, task , source, destination, path, req_offset, req_size, task.job.iotype)
-        #task.reqCount += 1
+      #dc.mapper_list[mapper_id].outstanding_task.append(task.task_id)
+      #for i in range(task.offset, task.offset + task.lenght, dc.mapper_size):
+      destination = "cache"+str(task.rack)
+      source = task.mapper_id
+      path = [source,destination]
+      req_offset = task.offset
+      #req_size = dc.mapper_size
+      scheduler.rid.increment()
+      req_id = scheduler.rid.value()
+      dc.outstanding_req[req_id] = [True, task.job.jid]
+      req = Request(req_id, mapper_id, task , source, destination, path, req_offset, task.lenght, task.job.iotype)
+      #task.reqCount += 1
         
-        #print("Generator Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, req.dest, mapper_id, req.path)  
-        #print("Generator Request:", req.rtype)  
-        #readReq(req, dc, env)
-        generate_event(req, dc, env, task.job.iotype)
-        #print("req id:", req_id, "job id:", req.task.job.jid, "objname:", req.task.job.objname, "mapper:", req.task.job.mapper, "rack:", req.task.rack, "cpu:", req.task.cpu, "task offset:", req.task.offset)
-        if task.job.iotype == 'delete':
-          break;
+      #print("Generator Request:", req.req_id, req.name, req.task.job.iotype, req.offset, req.end, req.dest, mapper_id, req.path)  
+      #print("Generator Request:", req.rtype)  
+      #readReq(req, dc, env)
+      generate_event(req, dc, env, task.job.iotype)
+      #print("req id:", req_id, "job id:", req.task.job.jid, "objname:", req.task.job.objname, "mapper:", req.task.job.mapper, "rack:", req.task.rack, "cpu:", req.task.cpu, "task offset:", req.task.offset)
 
+      """
+      if task.job.iotype == 'delete':
+        break;
+      """

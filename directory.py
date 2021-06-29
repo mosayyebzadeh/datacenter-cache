@@ -32,7 +32,12 @@ class Directory:
 
   def updateGFreq(self, key):
     if key in self.dict:  
-        self.dict[key]['gfreq'] +=1 # update global access freq
+        self.dict[key]['gfreq'] += 1 # update global access freq
+
+  def updateGFreqLFUDA(self, key, value):
+    if key in self.dict:  
+        self.dict[key]['gfreq'] =value # update global access freq
+
 
   """
   def updateTime(self, key, time):
@@ -45,7 +50,8 @@ class Directory:
     #self.dirTimer.start()
     value = self.dict[key]
     loc = value['location']
-    if len(loc) == 1: #final copy
+    #print("directory removeBlock key and location is: ", key, loc)
+    if len(loc) <= 1: #final copy
         #value['valid'] = 0
         #loc.remove(location)
         #value['location'] = loc
@@ -57,6 +63,8 @@ class Directory:
 
         self.dict.update({key: value}) #There is no cache having the data
     #self.dirTimer.stop()
+    #for k in self.dict.keys():
+    #    print(k, self.dict[k]['gfreq'], self.dict[k]['location'])
 
 
   def get_all_blk_location(self,key):
